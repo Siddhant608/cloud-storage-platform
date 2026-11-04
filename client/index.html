@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="A secure file storage and collaboration platform." />
+  <title>CloudVault | Cloud Storage</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+  <script src="/js/app.js" defer></script>
+</head>
+<body>
+  <main class="page-shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="CloudVault home">
+        <span class="brand-mark">C</span>
+        <span>CloudVault</span>
+      </a>
+      <span class="environment-label">Development build</span>
+    </header>
+
+    <section class="hero">
+      <p class="eyebrow">YOUR FILES, ORGANIZED</p>
+      <h1>One secure place for your files.</h1>
+      <p class="intro">Upload, organize, share, and keep track of every version of your files.</p>
+
+      <div class="status-card">
+        <div>
+          <p class="status-title">Backend connection</p>
+          <p id="connection-message" class="status-message">Checking API and database...</p>
+        </div>
+        <span id="connection-indicator" class="status-indicator" aria-label="Connection status"></span>
+      </div>
+
+      <button id="check-connection-button" class="primary-button" type="button">
+        Check connection again
+      </button>
+    </section>
+
+    <footer>CloudVault · Full-Stack Development Project</footer>
+  </main>
+</body>
+</html>

@@ -1,0 +1,125 @@
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #172033;
+  background: #f4f6fb;
+  font-synthesis: none;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: radial-gradient(circle at top right, #e4ebff 0, transparent 34rem), #f4f6fb;
+}
+
+.page-shell {
+  width: min(100% - 40px, 1050px);
+  min-height: 100vh;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  min-height: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #e2e7f0;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  color: #172033;
+  text-decoration: none;
+  font-size: 1.1rem;
+  font-weight: 750;
+}
+
+.brand-mark {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  color: white;
+  background: #465fe8;
+}
+
+.environment-label { color: #68738a; font-size: 0.85rem; }
+
+.hero {
+  width: min(100%, 650px);
+  margin: auto;
+  padding: 90px 0;
+}
+
+.eyebrow {
+  color: #465fe8;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+h1 {
+  max-width: 600px;
+  margin: 14px 0;
+  font-size: clamp(2.5rem, 7vw, 4.5rem);
+  line-height: 1.04;
+  letter-spacing: -0.055em;
+}
+
+.intro {
+  max-width: 520px;
+  color: #64708a;
+  font-size: 1.1rem;
+  line-height: 1.7;
+}
+
+.status-card {
+  margin: 36px 0 18px;
+  padding: 20px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid #e0e5ef;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 12px 35px rgba(30, 47, 90, 0.06);
+}
+
+.status-title { margin: 0 0 5px; font-weight: 700; }
+.status-message { margin: 0; color: #68738a; font-size: 0.92rem; }
+.status-indicator { width: 12px; height: 12px; border-radius: 50%; background: #a7afbd; }
+.status-indicator.online { background: #1baf73; box-shadow: 0 0 0 5px #e2f7ee; }
+.status-indicator.offline { background: #d94b4b; box-shadow: 0 0 0 5px #fdeaea; }
+
+.primary-button {
+  border: 0;
+  border-radius: 10px;
+  padding: 13px 18px;
+  color: white;
+  background: #465fe8;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.primary-button:hover { background: #344bd0; }
+.primary-button:disabled { cursor: wait; opacity: 0.65; }
+
+footer {
+  padding: 24px 0;
+  border-top: 1px solid #e2e7f0;
+  color: #7b8497;
+  font-size: 0.82rem;
+}
+
+@media (max-width: 520px) {
+  .page-shell { width: min(100% - 28px, 1050px); }
+  .environment-label { font-size: 0.74rem; }
+  .hero { padding: 65px 0; }
+}
