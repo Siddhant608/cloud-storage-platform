@@ -16,3 +16,5 @@ server/uploads-temp/
 venv/
 .venv/
 __pycache__/
+
+server/storage/demo-share-links.local.json

@@ -14,6 +14,8 @@ import { pool } from "./db/pool.js";
 import healthRouter from "./routes/health.routes.js";
 import authRouter from "./routes/auth.routes.js";
 import filesRouter from "./routes/files.routes.js";
+import foldersRouter from "./routes/folders.routes.js";
+import activityRouter from "./routes/activity.routes.js";
 
 import { errorHandler } from "./middleware/errorHandler.js";
 
@@ -68,6 +70,8 @@ app.use(express.static(clientDirectory));
 app.use("/api/health", healthRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/files", filesRouter);
+app.use("/api/folders", foldersRouter);
+app.use("/api/activity", activityRouter);
 
 // Handle unknown routes
 app.use((req, res) => {
