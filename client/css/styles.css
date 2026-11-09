@@ -399,3 +399,45 @@ button { cursor: pointer; }
     padding: 17px;
   }
 }
+/* File action buttons */
+.file-row {
+  grid-template-columns: 42px minmax(0, 1fr) auto auto;
+}
+
+.file-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.delete-file-button {
+  border: 1px solid #f2cccc;
+  border-radius: 7px;
+  background: #fff3f3;
+  color: #d14343;
+  padding: 8px 12px;
+  font-size: .76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.delete-file-button:hover {
+  background: #ffe4e4;
+}
+
+.delete-file-button:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 520px) {
+  .file-actions {
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .delete-file-button {
+    padding: 7px 8px;
+    font-size: .68rem;
+  }
+}

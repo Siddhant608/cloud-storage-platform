@@ -517,14 +517,39 @@ async function loadExistingShareLinks(fileId) {
 }
 
 // Share button click handling
-document.addEventListener("click", event => {
-  const button = event.target.closest(".share-file-button");
-  if (!button) return;
+// File action click handling
+document.addEventListener("click", async event => {
+  const shareButton = event.target.closest(".share-file-button");
 
-  openShareDialog(
-    button.dataset.fileId,
-    button.dataset.fileName
-  ).catch(error => alert(error.message));
+  if (shareButton) {
+    openShareDialog(
+      shareButton.dataset.fileId,
+      shareButton.dataset.fileName
+    ).catch(error => alert(error.message));
+    return;
+  }
+
+  const deleteButton = event.target.closest(".delete-file-button");
+  if (!deleteButton) return;
+
+  const fileId = deleteButton.dataset.fileId;
+  const fileName = deleteButton.dataset.fileName;
+
+  if (!confirm(`Move "${fileName}" to trash?`)) return;
+
+  deleteButton.disabled = true;
+
+  try {
+    await apiRequest(`/api/files/${encodeURIComponent(fileId)}`, {
+      method: "DELETE"
+    });
+
+    await loadDashboard();
+    showDashboardMessage("File moved to trash successfully.");
+  } catch (error) {
+    alert(error.message);
+    deleteButton.disabled = false;
+  }
 });
 
 function createFileRow(file) {
@@ -537,21 +562,26 @@ function createFileRow(file) {
 
   const details = document.createElement("div");
   details.className = "file-details";
+
   const name = document.createElement("strong");
   name.textContent = file.display_name || "Untitled file";
+
   const meta = document.createElement("span");
-  meta.textContent = `${formatBytes(file.latest_size_bytes)} · Updated ${formatDate(file.updated_at || file.created_at)}`;
+  meta.textContent =
+    `${formatBytes(file.latest_size_bytes)} · Updated ${formatDate(file.updated_at || file.created_at)}`;
   details.append(name, meta);
 
   const version = document.createElement("span");
   version.className = "file-version";
   version.textContent = file.latest_version ? `v${file.latest_version}` : "";
 
+  const actions = document.createElement("div");
+  actions.className = "file-actions";
+
   const download = document.createElement("a");
   download.className = "download-link";
   download.textContent = "Download";
   download.href = `/api/files/${encodeURIComponent(file.id)}/versions/${encodeURIComponent(file.latest_version || 1)}/download`;
-  download.setAttribute("aria-label", `Download ${file.display_name || "file"}`);
 
   const share = document.createElement("button");
   share.type = "button";
@@ -559,11 +589,23 @@ function createFileRow(file) {
   share.textContent = "Share";
   share.dataset.fileId = file.id;
   share.dataset.fileName = file.display_name || "Untitled file";
-  share.setAttribute("aria-label", `Share ${file.display_name || "file"}`);
 
-  row.append(icon, details, version, download, share);
+  actions.append(download, share);
+
+  if (currentUser?.id && file.owner_id === currentUser.id) {
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "delete-file-button";
+    deleteButton.textContent = "Delete";
+    deleteButton.dataset.fileId = file.id;
+    deleteButton.dataset.fileName = file.display_name || "Untitled file";
+    actions.append(deleteButton);
+  }
+
+  row.append(icon, details, version, actions);
   return row;
 }
+
 
 function renderFileList(container, files, emptyText) {
   container.replaceChildren();
