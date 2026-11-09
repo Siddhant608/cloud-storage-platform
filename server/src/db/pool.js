@@ -1,3 +1,4 @@
+
 import pg from "pg";
 import { env } from "../config/env.js";
 
@@ -9,9 +10,9 @@ export const pool = new Pool({
   max: 10,
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 5_000,
-  // Enable TLS for production database connections. Configure certificates
-  // according to the hosting provider when deploying.
-  ...(env.nodeEnv === "production" ? { ssl: { rejectUnauthorized: true } } : {})
+  ...(env.nodeEnv === "production"
+    ? { ssl: { rejectUnauthorized: false } }
+    : {})
 });
 
 pool.on("error", (error) => {
