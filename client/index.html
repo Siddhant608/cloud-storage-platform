@@ -1,42 +1,216 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="A secure file storage and collaboration platform." />
-  <title>CloudVault | Cloud Storage</title>
-  <link rel="stylesheet" href="/css/styles.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="CloudVault secure cloud file storage and collaboration.">
+  <title>CloudVault | Secure Cloud Storage</title>
+  <link rel="stylesheet" href="/css/styles.css">
   <script src="/js/app.js" defer></script>
 </head>
 <body>
-  <main class="page-shell">
+  <main class="app-shell">
     <header class="topbar">
-      <a class="brand" href="/" aria-label="CloudVault home">
+      <a class="brand" href="/">
         <span class="brand-mark">C</span>
         <span>CloudVault</span>
       </a>
-      <span class="environment-label">Development build</span>
+      <span class="secure-label">
+        <span class="secure-dot"></span>
+        Secure workspace
+      </span>
     </header>
 
-    <section class="hero">
-      <p class="eyebrow">YOUR FILES, ORGANIZED</p>
-      <h1>One secure place for your files.</h1>
-      <p class="intro">Upload, organize, share, and keep track of every version of your files.</p>
-
-      <div class="status-card">
-        <div>
-          <p class="status-title">Backend connection</p>
-          <p id="connection-message" class="status-message">Checking API and database...</p>
+    <section class="auth-layout" id="auth-view">
+      <div class="intro-panel">
+        <p class="eyebrow">YOUR FILES. YOUR CONTROL.</p>
+        <h1>Everything you need to manage your files.</h1>
+        <p class="intro-text">
+          Store, organize and share your files securely.
+          Keep every version organized in one place.
+        </p>
+        <div class="feature-list">
+          <div class="feature">
+            <span class="feature-icon">↗</span>
+            <div><h3>Easy access</h3><p>Your files, organized in one workspace.</p></div>
+          </div>
+          <div class="feature">
+            <span class="feature-icon">▤</span>
+            <div><h3>Version history</h3><p>Keep track of changes to your files.</p></div>
+          </div>
+          <div class="feature">
+            <span class="feature-icon">⌘</span>
+            <div><h3>Collaboration</h3><p>Share files and work together.</p></div>
+          </div>
         </div>
-        <span id="connection-indicator" class="status-indicator" aria-label="Connection status"></span>
       </div>
 
-      <button id="check-connection-button" class="primary-button" type="button">
-        Check connection again
-      </button>
+      <div class="auth-card">
+        <div class="form-heading">
+          <p class="eyebrow" id="form-eyebrow">WELCOME BACK</p>
+          <h2 id="form-title">Sign in to CloudVault</h2>
+          <p id="form-description">Enter your details to access your workspace.</p>
+        </div>
+        <div class="tab-switch" role="tablist" aria-label="Authentication">
+          <button type="button" id="login-tab" class="tab active" role="tab" aria-selected="true">Sign in</button>
+          <button type="button" id="register-tab" class="tab" role="tab" aria-selected="false">Create account</button>
+        </div>
+        <form id="auth-form" novalidate>
+          <div class="form-group" id="name-group" hidden>
+            <label for="full-name">Full name</label>
+            <input id="full-name" name="fullName" type="text" placeholder="Your full name"
+                   autocomplete="name" minlength="2" maxlength="100">
+          </div>
+          <div class="form-group">
+            <label for="email">Email address</label>
+            <input id="email" name="email" type="email" placeholder="you@example.com"
+                   autocomplete="email" maxlength="255" required>
+          </div>
+          <div class="form-group">
+            <div class="label-row">
+              <label for="password">Password</label>
+              <button type="button" id="toggle-password" class="text-button">Show</button>
+            </div>
+            <input id="password" name="password" type="password" placeholder="Enter your password"
+                   autocomplete="current-password" required>
+          </div>
+          <p id="form-error" class="form-message error" role="alert" hidden></p>
+          <p id="form-success" class="form-message success" role="status" hidden></p>
+          <button class="submit-button" id="submit-button" type="submit">Sign in</button>
+        </form>
+        <p class="switch-prompt" id="switch-prompt">
+          Don't have an account?
+          <button type="button" id="switch-mode" class="text-button">Create one</button>
+        </p>
+        <div class="connection-status">
+          <span id="connection-indicator" class="status-dot"></span>
+          <span id="connection-message">Checking server connection...</span>
+        </div>
+      </div>
     </section>
 
-    <footer>CloudVault · Full-Stack Development Project</footer>
+    <section id="signed-in-view" class="dashboard-view" hidden>
+      <aside class="sidebar">
+        <div class="sidebar-heading">WORKSPACE</div>
+        <nav class="side-nav" aria-label="Main navigation">
+          <button class="nav-item active" type="button" data-page="overview"><span>⌂</span>Overview</button>
+          <button class="nav-item" type="button" data-page="files"><span>▤</span>My files</button>
+          <button class="nav-item" type="button" data-page="folders"><span>▰</span>Folders</button>
+          <button class="nav-item" type="button" data-page="shared"><span>↗</span>Shared</button>
+          <button class="nav-item" type="button" data-page="activity"><span>◷</span>Activity</button>
+        </nav>
+
+        <div class="sidebar-bottom">
+          <div class="profile-card">
+            <div class="avatar" id="user-avatar">U</div>
+            <div class="profile-copy">
+              <strong id="sidebar-user-name">Your account</strong>
+              <span id="sidebar-user-email"></span>
+            </div>
+          </div>
+          <button type="button" id="logout-button" class="logout-button">Sign out</button>
+        </div>
+      </aside>
+
+      <div class="dashboard-main">
+        <div class="dashboard-heading">
+          <div>
+            <p class="eyebrow">CLOUDVAULT WORKSPACE</p>
+            <h1 id="page-title">Overview</h1>
+            <p id="page-subtitle">Your files and storage at a glance.</p>
+          </div>
+          <div class="dashboard-actions">
+            <button type="button" id="create-folder-button" class="secondary-button">＋ New folder</button>
+            <button type="button" id="upload-button" class="primary-button">↑ Upload file</button>
+            <input id="file-input" type="file" hidden>
+          </div>
+        </div>
+
+        <p id="dashboard-message" class="dashboard-message" role="status" hidden></p>
+
+        <section id="overview-page" class="page-panel">
+          <div class="overview-grid">
+            <article class="storage-card">
+              <div class="card-heading">
+                <div><p class="card-label">STORAGE OVERVIEW</p><h2>Your storage</h2></div>
+                <span class="storage-symbol">▤</span>
+              </div>
+              <div class="storage-numbers">
+                <strong id="storage-used">Loading…</strong>
+                <span id="storage-total">of 500 MB</span>
+              </div>
+              <div class="storage-track"><div id="storage-progress" class="storage-progress"></div></div>
+              <div class="storage-legend">
+                <span><i class="legend-dot used-dot"></i><span id="storage-percent">0% used</span></span>
+                <span id="storage-available">500 MB available</span>
+              </div>
+            </article>
+            <article class="stat-card">
+              <span class="stat-icon files-icon">▤</span>
+              <p class="card-label">TOTAL FILES</p>
+              <strong id="total-files">—</strong>
+              <span class="stat-caption">Files in your workspace</span>
+            </article>
+            <article class="stat-card">
+              <span class="stat-icon folders-icon">▰</span>
+              <p class="card-label">TOTAL FOLDERS</p>
+              <strong id="total-folders">—</strong>
+              <span class="stat-caption">Your organized folders</span>
+            </article>
+          </div>
+
+          <section class="content-card">
+            <div class="section-heading">
+              <div><h2>Recent files</h2><p>Your latest uploads and updates.</p></div>
+              <button type="button" class="text-button" data-go-page="files">View all files →</button>
+            </div>
+            <div id="recent-files-list" class="file-list"></div>
+          </section>
+        </section>
+
+        <section id="files-page" class="page-panel" hidden>
+          <section class="content-card">
+            <div class="section-heading files-toolbar">
+              <div><h2>My files</h2><p>Browse and manage your stored files.</p></div>
+              <div class="list-controls">
+                <input id="file-search" type="search" placeholder="Search files…" aria-label="Search files">
+                <select id="file-sort" aria-label="Sort files">
+                  <option value="recent">Most recent</option>
+                  <option value="name">Name (A–Z)</option>
+                  <option value="size">Largest first</option>
+                </select>
+              </div>
+            </div>
+            <div id="files-list" class="file-list"></div>
+          </section>
+        </section>
+
+        <section id="folders-page" class="page-panel" hidden>
+          <section class="content-card">
+            <div class="section-heading"><div><h2>Your folders</h2><p>Folders in your workspace.</p></div></div>
+            <div id="folders-list" class="folder-grid"></div>
+          </section>
+        </section>
+
+        <section id="shared-page" class="page-panel" hidden>
+          <section class="content-card">
+            <div class="section-heading"><div><h2>Shared with you</h2><p>Files owned by other workspace members.</p></div></div>
+            <div id="shared-list" class="file-list"></div>
+          </section>
+        </section>
+
+        <section id="activity-page" class="page-panel" hidden>
+          <section class="content-card">
+            <div class="section-heading"><div><h2>Recent activity</h2><p>Recent events in your workspace.</p></div></div>
+            <div id="activity-list" class="activity-list"></div>
+          </section>
+        </section>
+
+        <footer class="dashboard-footer">
+          <span>CloudVault</span><span>Secure file storage and collaboration</span>
+        </footer>
+      </div>
+    </section>
   </main>
 </body>
 </html>

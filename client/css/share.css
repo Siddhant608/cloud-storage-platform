@@ -1,0 +1,152 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #f4f6fb;
+  color: #20243a;
+  font-family: Inter, Arial, sans-serif;
+}
+
+.public-container {
+  max-width: 850px;
+  margin: auto;
+  padding: 25px 20px;
+}
+
+.public-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 55px;
+  color: #72778b;
+  font-size: .9rem;
+}
+
+.public-logo {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: #4d62e8;
+  text-decoration: none;
+}
+
+.public-card {
+  max-width: 650px;
+  margin: auto;
+  padding: 38px;
+  border: 1px solid #e6e9f2;
+  border-radius: 18px;
+  background: white;
+  box-shadow: 0 12px 45px rgba(20, 30, 70, .06);
+}
+
+.public-icon {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 14px;
+  background: #eef0ff;
+  color: #4d62e8;
+  font-weight: 800;
+}
+
+.public-eyebrow {
+  margin-top: 28px;
+  color: #4d62e8;
+  font-size: .75rem;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+}
+
+.public-card h1 {
+  overflow-wrap: anywhere;
+  font-size: 1.8rem;
+}
+
+.public-muted {
+  color: #858a9b;
+}
+
+.public-permission {
+  display: inline-block;
+  margin: 18px 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #eef0ff;
+  color: #4d62e8;
+  font-size: .85rem;
+  font-weight: 700;
+}
+
+.public-download {
+  display: block;
+  padding: 15px;
+  border-radius: 10px;
+  background: #4d62e8;
+  color: white;
+  text-align: center;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.public-versions {
+  margin-top: 35px;
+}
+
+.public-versions h2 {
+  font-size: 1.1rem;
+}
+
+.public-version {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  padding: 16px 0;
+  border-top: 1px solid #edf0f5;
+}
+
+.public-version div {
+  display: grid;
+  gap: 5px;
+}
+
+.public-version span {
+  color: #858a9b;
+  font-size: .78rem;
+}
+
+.public-version a {
+  color: #4d62e8;
+  text-decoration: none;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.public-error {
+  margin-top: 20px;
+  padding: 15px;
+  border-radius: 9px;
+  background: #fff0f0;
+  color: #b52d39;
+}
+
+.public-footer {
+  margin-top: 35px;
+  color: #9297a6;
+  text-align: center;
+  font-size: .8rem;
+}
+
+@media(max-width: 550px) {
+  .public-card {
+    padding: 23px;
+  }
+
+  .public-card h1 {
+    font-size: 1.4rem;
+  }
+}

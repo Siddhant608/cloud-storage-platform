@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shared File - CloudVault</title>
+  <link rel="stylesheet" href="/css/share.css">
+  <script src="/js/share.js" defer></script>
+</head>
+<body>
+  <main class="public-container">
+    <header class="public-header">
+      <a href="/" class="public-logo">CloudVault</a>
+      <span>Secure file sharing</span>
+    </header>
+
+    <section class="public-card">
+      <div class="public-icon">FILE</div>
+
+      <p class="public-eyebrow">PUBLIC FILE</p>
+      <h1 id="public-file-name">Loading shared file...</h1>
+      <p id="public-file-info" class="public-muted">
+        Retrieving file information
+      </p>
+
+      <div id="public-error" class="public-error" hidden></div>
+
+      <div id="public-file-content" hidden>
+        <div class="public-permission" id="public-permission"></div>
+
+        <a id="public-download" class="public-download" href="#">
+          Download latest version
+        </a>
+
+        <section class="public-versions">
+          <h2>Version history</h2>
+          <div id="public-version-list"></div>
+        </section>
+      </div>
+    </section>
+
+    <footer class="public-footer">
+      Shared securely using CloudVault
+    </footer>
+  </main>
+</body>
+</html>

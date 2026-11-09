@@ -16,6 +16,7 @@ import authRouter from "./routes/auth.routes.js";
 import filesRouter from "./routes/files.routes.js";
 import foldersRouter from "./routes/folders.routes.js";
 import activityRouter from "./routes/activity.routes.js";
+import storageRouter from "./routes/storage.routes.js";
 
 import { errorHandler } from "./middleware/errorHandler.js";
 
@@ -41,7 +42,28 @@ const sessionStore = new PgStore({
 app.disable("x-powered-by");
 
 app.use(helmet());
-app.use(pinoHttp());
+app.use(
+  pinoHttp({
+    redact: {
+      paths: [
+        "req.headers.cookie",
+        "req.headers.authorization",
+        'res.headers["set-cookie"]'
+      ],
+      censor: "[REDACTED]"
+    },
+
+    serializers: {
+      req(req) {
+        return {
+          method: req.method,
+          remoteAddress: req.remoteAddress,
+          remotePort: req.remotePort
+        };
+      }
+    }
+  })
+);
 
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: false }));
@@ -72,6 +94,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/files", filesRouter);
 app.use("/api/folders", foldersRouter);
 app.use("/api/activity", activityRouter);
+app.use("/api/storage", storageRouter);
 
 // Handle unknown routes
 app.use((req, res) => {

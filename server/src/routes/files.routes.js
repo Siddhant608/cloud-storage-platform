@@ -281,19 +281,26 @@ async function claimUploadRequest(
   key,
   fingerprint
 ) {
+  const attemptToken = randomUUID();
+
   const inserted = await pool.query(
     `INSERT INTO upload_requests
-       (uploader_id, idempotency_key, request_payload_hash, status)
-     VALUES ($1, $2, $3, 'pending')
+       (uploader_id, idempotency_key, request_payload_hash,
+        status, attempt_token, lease_expires_at)
+     VALUES (
+       $1, $2, $3, 'pending', $4,
+       NOW() + INTERVAL '15 minutes'
+     )
      ON CONFLICT (uploader_id, idempotency_key)
      DO NOTHING
-     RETURNING id`,
-    [userId, key, fingerprint]
+     RETURNING id, attempt_token`,
+    [userId, key, fingerprint, attemptToken]
   );
 
   if (inserted.rowCount === 1) {
     return {
       requestId: inserted.rows[0].id,
+      attemptToken: inserted.rows[0].attempt_token,
       completed: null
     };
   }
@@ -321,38 +328,46 @@ async function claimUploadRequest(
   if (existing.status === "completed") {
     return {
       requestId: existing.id,
+      attemptToken: null,
       completed: await readCompletedUpload(existing.id)
     };
   }
 
-  if (existing.status === "pending") {
+  // Reclaim only failed requests or pending requests whose lease expired.
+  // The conditional UPDATE ensures only one retry can claim the request.
+const claimed = await pool.query(
+  `UPDATE upload_requests
+   SET status = 'pending',
+       attempt_token = $2,
+       lease_expires_at = NOW() + INTERVAL '15 minutes',
+       file_id = NULL,
+       version_id = NULL
+   WHERE id = $1
+     AND request_payload_hash = $3
+     AND (
+       status = 'failed'
+       OR (
+         status = 'pending'
+         AND lease_expires_at <= NOW()
+       )
+     )
+   RETURNING id, attempt_token`,
+  [existing.id, attemptToken, fingerprint]
+);
+
+  if (claimed.rowCount !== 1) {
     throw fail(
       409,
       "This logical upload is already in progress. Retry using the same key later."
     );
   }
 
-  // Allow another attempt after a previous failed attempt.
-  const claimed = await pool.query(
-    `UPDATE upload_requests
-     SET status = 'pending',
-         file_id = NULL,
-         version_id = NULL
-     WHERE id = $1 AND status = 'failed'
-     RETURNING id`,
-    [existing.id]
-  );
-
-  if (claimed.rowCount !== 1) {
-    throw fail(409, "Upload request is already being processed.");
-  }
-
   return {
-    requestId: existing.id,
+    requestId: claimed.rows[0].id,
+    attemptToken: claimed.rows[0].attempt_token,
     completed: null
   };
 }
-
 // Retrieve the already committed result
 async function readCompletedUpload(requestId) {
   const result = await pool.query(
@@ -397,10 +412,12 @@ async function readCompletedUpload(requestId) {
   };
 }
 
-// Mark a request complete inside the upload transaction
+// Mark a request complete inside the upload transaction.
+// The attempt token prevents an expired attempt from completing a newer retry.
 async function completeUploadRequest(
   client,
   requestId,
+  attemptToken,
   fileId,
   versionId
 ) {
@@ -408,26 +425,34 @@ async function completeUploadRequest(
     `UPDATE upload_requests
      SET file_id = $1,
          version_id = $2,
-         status = 'completed'
-     WHERE id = $3 AND status = 'pending'`,
-    [fileId, versionId, requestId]
+         status = 'completed',
+         lease_expires_at = NULL
+     WHERE id = $3
+       AND status = 'pending'
+       AND attempt_token = $4`,
+    [fileId, versionId, requestId, attemptToken]
   );
 
   if (result.rowCount !== 1) {
-    throw new Error("Could not finalize idempotency record.");
+    throw new Error(
+      "Upload attempt is no longer current; refusing to finalize it."
+    );
   }
 }
 
-// Mark an unsuccessful attempt as failed
-async function markUploadRequestFailed(requestId) {
+// Mark an unsuccessful attempt as failed.
+// An old attempt cannot fail a newer attempt.
+async function markUploadRequestFailed(requestId, attemptToken) {
   await pool.query(
     `UPDATE upload_requests
-     SET status = 'failed'
-     WHERE id = $1 AND status = 'pending'`,
-    [requestId]
+     SET status = 'failed',
+         lease_expires_at = NULL
+     WHERE id = $1
+       AND status = 'pending'
+       AND attempt_token = $2`,
+    [requestId, attemptToken]
   );
 }
-
 
 // ==========================================
 // 1. UPLOAD NEW FILE
@@ -440,6 +465,7 @@ router.post("/", requireAuth, receiveFile, async (req, res, next) => {
   let savedBlobPath = null;
   let client = null;
   let requestId = null;
+  let attemptToken = null;
 
   try {
     if (!req.file) {
@@ -469,6 +495,7 @@ router.post("/", requireAuth, receiveFile, async (req, res, next) => {
     );
 
     requestId = claim.requestId;
+    attemptToken = claim.attemptToken;
 
     // A retry of an already completed upload returns its old result.
     if (claim.completed) {
@@ -530,6 +557,7 @@ router.post("/", requireAuth, receiveFile, async (req, res, next) => {
     await completeUploadRequest(
       client,
       requestId,
+      attemptToken,
       file.id,
       version.id
     );
@@ -562,7 +590,7 @@ router.post("/", requireAuth, receiveFile, async (req, res, next) => {
     }
 
     if (requestId) {
-      await markUploadRequestFailed(requestId).catch(() => {});
+      await markUploadRequestFailed(requestId, attemptToken).catch(() => {});
     }
 
     return next(error);
@@ -631,6 +659,7 @@ router.post(
     let reserved = false;
     let savedBlobPath = null;
     let requestId = null;
+  let attemptToken = null;
 
     try {
       if (!UUID_RE.test(req.params.id)) {
@@ -676,6 +705,7 @@ router.post(
       );
 
       requestId = claim.requestId;
+    attemptToken = claim.attemptToken;
 
       // Return the original result for an already completed retry.
       if (claim.completed) {
@@ -760,6 +790,7 @@ router.post(
           await completeUploadRequest(
             client,
             requestId,
+            attemptToken,
             fileId,
             version.id
           );
@@ -828,7 +859,7 @@ router.post(
       }
 
       if (requestId) {
-        await markUploadRequestFailed(requestId).catch(() => {});
+        await markUploadRequestFailed(requestId, attemptToken).catch(() => {});
       }
 
       return next(error);
@@ -1737,6 +1768,7 @@ router.post(
     let reserved = false;
     let savedBlobPath = null;
     let requestId = null;
+  let attemptToken = null;
     let ownerId = null;
     let bytes = 0;
 
@@ -1796,6 +1828,7 @@ router.post(
       );
 
       requestId = claim.requestId;
+    attemptToken = claim.attemptToken;
 
       // Return the original result for an already completed retry.
       if (claim.completed) {
@@ -1915,6 +1948,7 @@ router.post(
           await completeUploadRequest(
             client,
             requestId,
+            attemptToken,
             fileId,
             version.id
           );
@@ -1980,7 +2014,7 @@ router.post(
       }
 
       if (requestId) {
-        await markUploadRequestFailed(requestId).catch(() => {});
+        await markUploadRequestFailed(requestId, attemptToken).catch(() => {});
       }
 
       return next(error);
