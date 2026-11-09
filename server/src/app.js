@@ -21,6 +21,8 @@ import storageRouter from "./routes/storage.routes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 const app = express();
+// Trust Render's HTTPS reverse proxy for secure session cookies.
+app.set("trust proxy", 1);
 
 const currentFile = fileURLToPath(import.meta.url);
 const currentDirectory = path.dirname(currentFile);
