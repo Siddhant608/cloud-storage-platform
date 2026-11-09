@@ -16,6 +16,7 @@ import authRouter from "./routes/auth.routes.js";
 import filesRouter from "./routes/files.routes.js";
 import foldersRouter from "./routes/folders.routes.js";
 import activityRouter from "./routes/activity.routes.js";
+import storageRouter from "./routes/storage.routes.js";
 
 import { errorHandler } from "./middleware/errorHandler.js";
 
@@ -93,6 +94,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/files", filesRouter);
 app.use("/api/folders", foldersRouter);
 app.use("/api/activity", activityRouter);
+app.use("/api/storage", storageRouter);
 
 // Handle unknown routes
 app.use((req, res) => {
