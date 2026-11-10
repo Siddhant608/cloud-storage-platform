@@ -757,11 +757,11 @@ router.post(
       const key = getIdempotencyKey(req);
 
       const fingerprint = uploadFingerprint({
-        operation: "create-file",
+        operation: "new-version",
+        fileId,
         displayName: name,
         sizeBytes: bytes,
-        checksum,
-        folderId
+        checksum
       });
 
       // Claim this logical upload.
