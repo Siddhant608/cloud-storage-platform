@@ -718,6 +718,7 @@ router.get("/", requireAuth, async (req, res, next) => {
 // ==========================================
 
 
+
 router.post(
   "/:id/versions",
   requireAuth,
@@ -726,7 +727,7 @@ router.post(
     let reserved = false;
     let savedBlobPath = null;
     let requestId = null;
-  let attemptToken = null;
+    let attemptToken = null;
 
     try {
       if (!UUID_RE.test(req.params.id)) {
@@ -734,7 +735,10 @@ router.post(
       }
 
       if (!req.file) {
-        throw fail(400, "Upload one file using the multipart field named 'file'.");
+        throw fail(
+          400,
+          "Upload one file using the multipart field named 'file'."
+        );
       }
 
       const fileId = req.params.id;
@@ -743,6 +747,7 @@ router.post(
       const checksum = await sha256(req.file.path);
       const name = displayName(req);
 
+      // Check file access.
       const access = await fileAccess(fileId, userId);
 
       if (!access) {
@@ -756,6 +761,7 @@ router.post(
       // Require an idempotency key.
       const key = getIdempotencyKey(req);
 
+      // Create fingerprint for the new version upload.
       const fingerprint = uploadFingerprint({
         operation: "new-version",
         fileId,
@@ -772,7 +778,7 @@ router.post(
       );
 
       requestId = claim.requestId;
-    attemptToken = claim.attemptToken;
+      attemptToken = claim.attemptToken;
 
       // Return the original result for an already completed retry.
       if (claim.completed) {
@@ -840,12 +846,15 @@ router.post(
           );
 
           const version = result.rows[0];
+
+          // Update the file modification timestamp.
           await client.query(
-              `UPDATE files
-              SET updated_at = NOW()
-              WHERE id = $1`,
-              [fileId]
-            );
+            `UPDATE files
+             SET updated_at = NOW()
+             WHERE id = $1`,
+            [fileId]
+          );
+
           // Finalize quota within the same transaction.
           await finalizeQuota(client, userId, bytes);
 
@@ -919,10 +928,12 @@ router.post(
       });
 
     } catch (error) {
+      // Clean up saved blob if upload failed.
       if (savedBlobPath) {
         await cleanup(savedBlobPath);
       }
 
+      // Release quota if it was reserved.
       if (reserved) {
         await releaseQuota(
           req.userId,
@@ -930,17 +941,23 @@ router.post(
         ).catch(() => {});
       }
 
+      // Mark the idempotency request as failed.
       if (requestId) {
-        await markUploadRequestFailed(requestId, attemptToken).catch(() => {});
+        await markUploadRequestFailed(
+          requestId,
+          attemptToken
+        ).catch(() => {});
       }
 
       return next(error);
 
     } finally {
+      // Clean up temporary upload file.
       await cleanup(req.file?.path);
     }
   }
 );
+
 
 // ==========================================
 // 4. VIEW VERSION HISTORY
