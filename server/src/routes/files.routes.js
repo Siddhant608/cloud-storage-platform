@@ -461,6 +461,7 @@ async function markUploadRequestFailed(requestId, attemptToken) {
 
 
 
+
 router.post("/", requireAuth, receiveFile, async (req, res, next) => {
   let reserved = false;
   let savedBlobPath = null;
@@ -524,7 +525,7 @@ router.post("/", requireAuth, receiveFile, async (req, res, next) => {
       });
     }
 
-    // Require an idempotency key for each logical upload.
+    // Require an idempotency key.
     const key = getIdempotencyKey(req);
 
     const fingerprint = uploadFingerprint({
@@ -544,7 +545,7 @@ router.post("/", requireAuth, receiveFile, async (req, res, next) => {
     requestId = claim.requestId;
     attemptToken = claim.attemptToken;
 
-    // A retry of an already completed upload returns its old result.
+    // Return the previous result if already completed.
     if (claim.completed) {
       return res.status(200).json({
         message: "This upload was already completed.",
@@ -556,7 +557,7 @@ router.post("/", requireAuth, receiveFile, async (req, res, next) => {
     await reserveQuota(userId, bytes);
     reserved = true;
 
-    // Store the actual file using a unique immutable key.
+    // Store the file using a unique immutable key.
     const blobKey = randomUUID();
 
     savedBlobPath = blobPathFor(blobKey);
@@ -576,7 +577,7 @@ router.post("/", requireAuth, receiveFile, async (req, res, next) => {
 
     const file = fileResult.rows[0];
 
-    // First upload always receives Version 1.
+    // First upload receives Version 1.
     const versionResult = await client.query(
       `INSERT INTO file_versions
          (file_id, version_no, uploader_id, blob_key,
@@ -652,6 +653,7 @@ router.post("/", requireAuth, receiveFile, async (req, res, next) => {
     await cleanup(req.file?.path);
   }
 });
+
 // ==========================================
 // 2. LIST USER FILES
 // GET /api/files
