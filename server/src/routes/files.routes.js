@@ -460,6 +460,7 @@ async function markUploadRequestFailed(requestId, attemptToken) {
 // ==========================================
 
 
+
 router.post("/", requireAuth, receiveFile, async (req, res, next) => {
   let reserved = false;
   let savedBlobPath = null;
@@ -475,7 +476,53 @@ router.post("/", requireAuth, receiveFile, async (req, res, next) => {
     const userId = req.userId;
     const name = displayName(req);
     const bytes = req.file.size;
+    const folderId = req.body.folderId || null;
+
+    // Validate folder if provided.
+    if (folderId) {
+      if (!UUID_RE.test(folderId)) {
+        throw fail(400, "Invalid folder ID.");
+      }
+
+      const folderResult = await pool.query(
+        `SELECT id
+         FROM folders
+         WHERE id = $1
+           AND owner_id = $2`,
+        [folderId, userId]
+      );
+
+      if (folderResult.rowCount !== 1) {
+        throw fail(404, "Folder not found or access denied.");
+      }
+    }
+
+    // Calculate SHA-256 checksum.
     const checksum = await sha256(req.file.path);
+
+    // Check for duplicate file.
+    const duplicate = await pool.query(
+      `SELECT
+         f.id,
+         f.display_name,
+         fv.version_no
+       FROM files f
+       JOIN file_versions fv
+         ON fv.file_id = f.id
+       WHERE f.owner_id = $1
+         AND f.deleted_at IS NULL
+         AND fv.checksum_sha256 = $2
+       LIMIT 1`,
+      [userId, checksum]
+    );
+
+    // Notify user if duplicate exists.
+    if (duplicate.rowCount > 0) {
+      return res.status(409).json({
+        error: "An identical file already exists.",
+        duplicate: duplicate.rows[0]
+      });
+    }
 
     // Require an idempotency key for each logical upload.
     const key = getIdempotencyKey(req);
@@ -521,10 +568,10 @@ router.post("/", requireAuth, receiveFile, async (req, res, next) => {
 
     // Create logical file record.
     const fileResult = await client.query(
-      `INSERT INTO files (owner_id, display_name)
-       VALUES ($1, $2)
-       RETURNING id, owner_id, display_name, created_at`,
-      [userId, name]
+      `INSERT INTO files (owner_id, folder_id, display_name)
+       VALUES ($1, $2, $3)
+       RETURNING id, owner_id, folder_id, display_name, created_at`,
+      [userId, folderId, name]
     );
 
     const file = fileResult.rows[0];
@@ -549,11 +596,13 @@ router.post("/", requireAuth, receiveFile, async (req, res, next) => {
 
     const version = versionResult.rows[0];
 
+    // Finalize quota within the same transaction.
     await finalizeQuota(client, userId, bytes);
 
+    // Add activity event.
     await activity(client, userId, file.id, version.id, 1);
 
-    // Save the result of this logical upload in the same transaction.
+    // Complete the logical upload request.
     await completeUploadRequest(
       client,
       requestId,
@@ -590,7 +639,10 @@ router.post("/", requireAuth, receiveFile, async (req, res, next) => {
     }
 
     if (requestId) {
-      await markUploadRequestFailed(requestId, attemptToken).catch(() => {});
+      await markUploadRequestFailed(
+        requestId,
+        attemptToken
+      ).catch(() => {});
     }
 
     return next(error);
@@ -600,7 +652,6 @@ router.post("/", requireAuth, receiveFile, async (req, res, next) => {
     await cleanup(req.file?.path);
   }
 });
-
 // ==========================================
 // 2. LIST USER FILES
 // GET /api/files
@@ -773,7 +824,12 @@ router.post(
           );
 
           const version = result.rows[0];
-
+          await client.query(
+              `UPDATE files
+              SET updated_at = NOW()
+              WHERE id = $1`,
+              [fileId]
+            );
           // Finalize quota within the same transaction.
           await finalizeQuota(client, userId, bytes);
 

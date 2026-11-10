@@ -30,6 +30,7 @@ let currentMode = "login";
 let currentUser = null;
 let allFiles = [];
 let allFolders = [];
+let currentFolderId = null;
 let currentPage = "overview";
 
 const pageInfo = {
@@ -616,41 +617,166 @@ function renderFileList(container, files, emptyText) {
   files.forEach(file => container.append(createFileRow(file)));
 }
 
-function renderFiles() {
-  const query = (document.querySelector("#file-search")?.value || "").trim().toLowerCase();
-  const sort = document.querySelector("#file-sort")?.value || "recent";
-  let files = allFiles.filter(file => (file.display_name || "").toLowerCase().includes(query));
 
+function renderFiles() {
+  const container = document.querySelector("#files-list");
+
+  if (!container) return;
+
+  const query = (
+    document.querySelector("#file-search")?.value || ""
+  ).trim().toLowerCase();
+
+  const sort = document.querySelector("#file-sort")?.value || "recent";
+
+  let files = allFiles.filter(file =>
+    (file.folder_id || null) === currentFolderId &&
+    (file.display_name || "").toLowerCase().includes(query)
+  );
+
+  // Sort files
   if (sort === "name") {
-    files.sort((a, b) => (a.display_name || "").localeCompare(b.display_name || ""));
+    files.sort((a, b) =>
+      (a.display_name || "").localeCompare(b.display_name || "")
+    );
   } else if (sort === "size") {
-    files.sort((a, b) => Number(b.latest_size_bytes || 0) - Number(a.latest_size_bytes || 0));
+    files.sort((a, b) =>
+      Number(b.latest_size_bytes || 0) -
+      Number(a.latest_size_bytes || 0)
+    );
   } else {
-    files.sort((a, b) => new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0));
+    files.sort((a, b) =>
+      new Date(b.updated_at || b.created_at || 0) -
+      new Date(a.updated_at || a.created_at || 0)
+    );
   }
 
-  renderFileList(document.querySelector("#files-list"), files, "No files match your search.");
+  // Render file list
+  renderFileList(
+    container,
+    files,
+    "No files match your search."
+  );
+
+  // Show all files button
+  if (currentFolderId) {
+    const backButton = document.createElement("button");
+
+    backButton.textContent = "Show all files";
+    backButton.type = "button";
+
+    backButton.onclick = () => {
+      currentFolderId = null;
+      renderFiles();
+    };
+
+    container.prepend(backButton);
+  }
 }
+
+
 
 function renderFolders() {
   const container = document.querySelector("#folders-list");
+
   container.replaceChildren();
+
   if (!allFolders.length) {
-    container.append(makeEmptyState("No folders yet. Create a folder to organize your files."));
+    container.append(
+      makeEmptyState(
+        "No folders yet. Create a folder to organize your files."
+      )
+    );
     return;
   }
 
   allFolders.forEach(folder => {
     const card = document.createElement("article");
     card.className = "folder-card";
+
     const icon = document.createElement("span");
     icon.className = "folder-card-icon";
     icon.textContent = "▰";
+
     const name = document.createElement("strong");
     name.textContent = folder.folder_name || "Untitled folder";
+
     const date = document.createElement("span");
     date.textContent = `Created ${formatDate(folder.created_at)}`;
-    card.append(icon, name, date);
+
+    // Open folder button
+    const openButton = document.createElement("button");
+    openButton.textContent = "Open";
+    openButton.type = "button";
+
+    openButton.addEventListener("click", () => {
+      currentFolderId = folder.id;
+      setPage("files");
+      renderFiles();
+    });
+
+    // Rename folder button
+    const renameButton = document.createElement("button");
+    renameButton.textContent = "Rename";
+    renameButton.type = "button";
+
+    renameButton.onclick = async () => {
+      const newName = prompt(
+        "Enter new folder name:",
+        folder.folder_name || ""
+      );
+
+      if (!newName || !newName.trim()) return;
+
+      try {
+        await apiRequest(
+          `/api/folders/${encodeURIComponent(folder.id)}`,
+          {
+            method: "PATCH",
+            body: {
+              folder_name: newName.trim()
+            }
+          }
+        );
+
+        await loadDashboard();
+      } catch (error) {
+        showDashboardMessage(error.message, true);
+      }
+    };
+
+    // Delete folder button
+    const deleteButton = document.createElement("button");
+    deleteButton.textContent = "Delete";
+    deleteButton.type = "button";
+
+    deleteButton.onclick = async () => {
+      if (!confirm("Delete this folder?")) return;
+
+      try {
+        await apiRequest(
+          `/api/folders/${encodeURIComponent(folder.id)}`,
+          {
+            method: "DELETE"
+          }
+        );
+
+        await loadDashboard();
+      } catch (error) {
+        showDashboardMessage(error.message, true);
+      }
+    };
+
+    // Append elements to folder card
+    card.append(
+      icon,
+      name,
+      date,
+      openButton,
+      renameButton,
+      deleteButton
+    );
+
     container.append(card);
   });
 }
@@ -757,7 +883,12 @@ async function createFolder() {
 async function uploadSelectedFile(file) {
   if (!file) return;
   const formData = new FormData();
+
   formData.append("file", file);
+
+  if (currentFolderId) {
+  formData.append("folderId", currentFolderId);
+}
 
   const uploadButton = document.querySelector("#upload-button");
   uploadButton.disabled = true;
