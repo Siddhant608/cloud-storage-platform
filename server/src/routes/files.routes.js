@@ -462,6 +462,7 @@ async function markUploadRequestFailed(requestId, attemptToken) {
 
 
 
+
 router.post("/", requireAuth, receiveFile, async (req, res, next) => {
   let reserved = false;
   let savedBlobPath = null;
@@ -471,7 +472,10 @@ router.post("/", requireAuth, receiveFile, async (req, res, next) => {
 
   try {
     if (!req.file) {
-      throw fail(400, "Upload one file using the multipart field named 'file'.");
+      throw fail(
+        400,
+        "Upload one file using the multipart field named 'file'."
+      );
     }
 
     const userId = req.userId;
@@ -501,33 +505,10 @@ router.post("/", requireAuth, receiveFile, async (req, res, next) => {
     // Calculate SHA-256 checksum.
     const checksum = await sha256(req.file.path);
 
-    // Check for duplicate file.
-    const duplicate = await pool.query(
-      `SELECT
-         f.id,
-         f.display_name,
-         fv.version_no
-       FROM files f
-       JOIN file_versions fv
-         ON fv.file_id = f.id
-       WHERE f.owner_id = $1
-         AND f.deleted_at IS NULL
-         AND fv.checksum_sha256 = $2
-       LIMIT 1`,
-      [userId, checksum]
-    );
-
-    // Notify user if duplicate exists.
-    if (duplicate.rowCount > 0) {
-      return res.status(409).json({
-        error: "An identical file already exists.",
-        duplicate: duplicate.rows[0]
-      });
-    }
-
     // Require an idempotency key.
     const key = getIdempotencyKey(req);
 
+    // Create upload fingerprint.
     const fingerprint = uploadFingerprint({
       operation: "create-file",
       displayName: name,
@@ -545,7 +526,7 @@ router.post("/", requireAuth, receiveFile, async (req, res, next) => {
     requestId = claim.requestId;
     attemptToken = claim.attemptToken;
 
-    // Return the previous result if already completed.
+    // Return the previous successful result on retry.
     if (claim.completed) {
       return res.status(200).json({
         message: "This upload was already completed.",
@@ -553,11 +534,40 @@ router.post("/", requireAuth, receiveFile, async (req, res, next) => {
       });
     }
 
+    // Check duplicate only for a new upload request.
+    const duplicate = await pool.query(
+      `SELECT
+         f.id,
+         f.display_name,
+         fv.version_no
+       FROM files f
+       JOIN file_versions fv
+         ON fv.file_id = f.id
+       WHERE f.owner_id = $1
+         AND f.deleted_at IS NULL
+         AND fv.checksum_sha256 = $2
+       LIMIT 1`,
+      [userId, checksum]
+    );
+
+    // Notify user if duplicate exists.
+    if (duplicate.rowCount > 0) {
+      await markUploadRequestFailed(
+        requestId,
+        attemptToken
+      );
+
+      return res.status(409).json({
+        error: "An identical file already exists.",
+        duplicate: duplicate.rows[0]
+      });
+    }
+
     // Reserve quota atomically.
     await reserveQuota(userId, bytes);
     reserved = true;
 
-    // Store the file using a unique immutable key.
+    // Store file using a unique immutable key.
     const blobKey = randomUUID();
 
     savedBlobPath = blobPathFor(blobKey);
@@ -597,13 +607,13 @@ router.post("/", requireAuth, receiveFile, async (req, res, next) => {
 
     const version = versionResult.rows[0];
 
-    // Finalize quota within the same transaction.
+    // Finalize quota within transaction.
     await finalizeQuota(client, userId, bytes);
 
     // Add activity event.
     await activity(client, userId, file.id, version.id, 1);
 
-    // Complete the logical upload request.
+    // Complete logical upload request.
     await completeUploadRequest(
       client,
       requestId,
@@ -628,10 +638,12 @@ router.post("/", requireAuth, receiveFile, async (req, res, next) => {
       await client.query("ROLLBACK").catch(() => {});
     }
 
+    // Remove saved blob if transaction fails.
     if (savedBlobPath) {
       await cleanup(savedBlobPath);
     }
 
+    // Release reserved quota.
     if (reserved) {
       await releaseQuota(
         req.userId,
@@ -639,6 +651,7 @@ router.post("/", requireAuth, receiveFile, async (req, res, next) => {
       ).catch(() => {});
     }
 
+    // Mark upload request failed.
     if (requestId) {
       await markUploadRequestFailed(
         requestId,
@@ -653,6 +666,7 @@ router.post("/", requireAuth, receiveFile, async (req, res, next) => {
     await cleanup(req.file?.path);
   }
 });
+
 
 // ==========================================
 // 2. LIST USER FILES

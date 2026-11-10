@@ -676,6 +676,7 @@ function renderFiles() {
 
 
 
+
 function renderFolders() {
   const container = document.querySelector("#folders-list");
 
@@ -694,13 +695,16 @@ function renderFolders() {
     const card = document.createElement("article");
     card.className = "folder-card";
 
+    // Folder icon
     const icon = document.createElement("span");
     icon.className = "folder-card-icon";
     icon.textContent = "▰";
 
+    // Folder name
     const name = document.createElement("strong");
     name.textContent = folder.folder_name || "Untitled folder";
 
+    // Folder creation date
     const date = document.createElement("span");
     date.textContent = `Created ${formatDate(folder.created_at)}`;
 
@@ -711,7 +715,9 @@ function renderFolders() {
 
     openButton.addEventListener("click", () => {
       currentFolderId = folder.id;
+
       setPage("files");
+
       renderFiles();
     });
 
@@ -726,20 +732,23 @@ function renderFolders() {
         folder.folder_name || ""
       );
 
-      if (!newName || !newName.trim()) return;
+      if (!newName || !newName.trim()) {
+        return;
+      }
 
       try {
         await apiRequest(
           `/api/folders/${encodeURIComponent(folder.id)}`,
           {
             method: "PATCH",
-            body: {
-              folder_name: newName.trim()
-            }
+            body: JSON.stringify({
+              folderName: newName.trim()
+            })
           }
         );
 
         await loadDashboard();
+
       } catch (error) {
         showDashboardMessage(error.message, true);
       }
@@ -751,7 +760,9 @@ function renderFolders() {
     deleteButton.type = "button";
 
     deleteButton.onclick = async () => {
-      if (!confirm("Delete this folder?")) return;
+      if (!confirm("Delete this folder?")) {
+        return;
+      }
 
       try {
         await apiRequest(
@@ -762,12 +773,13 @@ function renderFolders() {
         );
 
         await loadDashboard();
+
       } catch (error) {
         showDashboardMessage(error.message, true);
       }
     };
 
-    // Append elements to folder card
+    // Append all elements to folder card
     card.append(
       icon,
       name,
@@ -777,6 +789,7 @@ function renderFolders() {
       deleteButton
     );
 
+    // Add folder card to container
     container.append(card);
   });
 }
