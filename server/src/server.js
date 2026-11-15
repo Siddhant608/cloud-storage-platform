@@ -1,12 +1,14 @@
 import app from "./app.js";
 import { env } from "./config/env.js";
 import { pool } from "./db/pool.js";
+import { processPendingPurgeJobs } from "./services/purgeRecovery.js";
 
 let httpServer;
 
 async function startServer() {
   // Fail fast if PostgreSQL is unavailable; the project requires the database.
   await pool.query("SELECT 1");
+  await processPendingPurgeJobs(pool);
 
   httpServer = app.listen(env.port, () => {
     console.log(`Cloud Storage API is running at http://localhost:${env.port}`);
