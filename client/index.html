@@ -221,11 +221,38 @@
         </section>
 
         <section id="activity-page" class="page-panel" hidden>
-          <section class="content-card">
-            <div class="section-heading"><div><h2>Recent activity</h2><p>Recent events in your workspace.</p></div></div>
-            <div id="activity-list" class="activity-list"></div>
-          </section>
-        </section>
+  <section class="content-card">
+    <div class="section-heading">
+      <div>
+        <h2>Recent activity</h2>
+        <p>Track file, folder, version, and sharing events in your workspace.</p>
+      </div>
+      <button id="refresh-activity-button" class="secondary-button" type="button">
+        Refresh
+      </button>
+    </div>
+
+    <div class="activity-filters" role="group" aria-label="Filter activity">
+      <button class="activity-filter active" type="button" data-activity-category="all">All</button>
+      <button class="activity-filter" type="button" data-activity-category="files">Files</button>
+      <button class="activity-filter" type="button" data-activity-category="versions">Versions</button>
+      <button class="activity-filter" type="button" data-activity-category="folders">Folders</button>
+      <button class="activity-filter" type="button" data-activity-category="sharing">Sharing</button>
+    </div>
+
+    <p id="activity-status" class="activity-status" role="status" aria-live="polite">
+      Activity will appear here.
+    </p>
+
+    <div id="activity-list" class="activity-list"></div>
+
+    <div class="activity-load-more-wrap">
+      <button id="activity-load-more" class="secondary-button" type="button" hidden>
+        Load more
+      </button>
+    </div>
+  </section>
+</section>
 
         <footer class="dashboard-footer">
           <span>CloudVault</span><span>Secure file storage and collaboration</span>
