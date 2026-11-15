@@ -569,3 +569,93 @@ button { cursor: pointer; }
   color: #354158;
   font-size: 0.95rem;
 }
+/* ==========================================
+   FILE VERSION HISTORY
+========================================== */
+
+.history-file-button {
+  border: 1px solid #dce4f0;
+  border-radius: 7px;
+  background: #f6f8fc;
+  color: #34445c;
+  padding: 8px 12px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.history-file-button:hover {
+  background: #edf2fa;
+}
+
+.history-modal {
+  max-width: 650px;
+}
+
+.history-version-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid #edf0f5;
+}
+
+.history-version-details {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.84rem;
+  min-width: 0;
+}
+
+.history-version-details strong {
+  color: #202b3c;
+}
+
+.history-version-details span,
+.history-version-details time {
+  color: #737d8e;
+  overflow-wrap: anywhere;
+}
+
+.history-download {
+  flex-shrink: 0;
+}
+
+@media (max-width: 520px) {
+  .history-file-button {
+    padding: 7px 8px;
+    font-size: 0.68rem;
+  }
+
+  .history-version-item {
+    align-items: flex-start;
+  }
+
+  .history-download {
+    padding: 7px 8px;
+  }
+}
+/* NEW VERSION BUTTON */
+
+.new-version-button {
+  border: 1px solid #cbdcfb;
+  border-radius: 7px;
+  background: #edf4ff;
+  color: #2456a6;
+  padding: 8px 12px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.new-version-button:hover {
+  background: #dceaff;
+}
+
+.new-version-button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}

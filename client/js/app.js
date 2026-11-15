@@ -264,6 +264,140 @@ function makeEmptyState(message) {
 }
 
 
+
+// ==========================================
+// FILE VERSION HISTORY
+// ==========================================
+
+function ensureVersionHistoryDialog() {
+  if (document.querySelector("#version-history-dialog")) return;
+
+  const dialog = document.createElement("div");
+  dialog.id = "version-history-dialog";
+  dialog.className = "share-overlay";
+  dialog.hidden = true;
+
+  dialog.innerHTML = `
+    <section class="share-modal history-modal"
+      role="dialog" aria-modal="true" aria-labelledby="history-title">
+      <div class="share-modal-header">
+        <div>
+          <span class="share-eyebrow">CLOUDVAULT HISTORY</span>
+          <h2 id="history-title">Version history</h2>
+          <p id="history-file-name"></p>
+        </div>
+        <button type="button" class="share-close"
+          id="history-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="share-modal-body">
+        <div id="history-loading">Loading version history...</div>
+        <div id="history-list"></div>
+      </div>
+    </section>
+  `;
+
+  document.body.appendChild(dialog);
+
+  dialog.querySelector("#history-close").addEventListener(
+    "click", closeVersionHistory
+  );
+
+  dialog.addEventListener("click", event => {
+    if (event.target === dialog) closeVersionHistory();
+  });
+}
+
+function closeVersionHistory() {
+  const dialog = document.querySelector("#version-history-dialog");
+  if (dialog) dialog.hidden = true;
+}
+
+function formatExactDateTime(value) {
+  if (!value) return "Date unavailable";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Date unavailable";
+
+  return new Intl.DateTimeFormat(undefined, {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+    timeZoneName: "short"
+  }).format(date);
+}
+
+function renderVersionHistory(versions, fileId) {
+  const container = document.querySelector("#history-list");
+  container.replaceChildren();
+
+  if (!versions.length) {
+    container.append(makeEmptyState("No version history is available."));
+    return;
+  }
+
+  versions.forEach(version => {
+    const item = document.createElement("article");
+    item.className = "history-version-item";
+
+    const details = document.createElement("div");
+    details.className = "history-version-details";
+
+    const heading = document.createElement("strong");
+    heading.textContent = `Version ${version.version_no}`;
+
+    const uploader = document.createElement("span");
+    uploader.textContent =
+      `Uploaded by ${version.uploader_name || "Unknown user"}`;
+
+    const size = document.createElement("span");
+    size.textContent = `Size: ${formatBytes(version.size_bytes)}`;
+
+    const date = document.createElement("time");
+    date.textContent = formatExactDateTime(version.uploaded_at);
+    date.dateTime = version.uploaded_at || "";
+
+    details.append(heading, uploader, size, date);
+
+    const download = document.createElement("a");
+    download.className = "download-link history-download";
+    download.textContent = "Download";
+    download.href =
+      `/api/files/${encodeURIComponent(fileId)}/versions/${encodeURIComponent(version.version_no)}/download`;
+
+    item.append(details, download);
+    container.append(item);
+  });
+}
+
+async function openVersionHistory(fileId, fileName) {
+  ensureVersionHistoryDialog();
+
+  const dialog = document.querySelector("#version-history-dialog");
+  const loading = dialog.querySelector("#history-loading");
+  const container = dialog.querySelector("#history-list");
+
+  dialog.querySelector("#history-file-name").textContent = fileName;
+  loading.hidden = false;
+  loading.textContent = "Loading version history...";
+  container.replaceChildren();
+  dialog.hidden = false;
+
+  try {
+    const data = await apiRequest(
+      `/api/files/${encodeURIComponent(fileId)}/versions`
+    );
+
+    renderVersionHistory(data.versions || [], fileId);
+    loading.hidden = true;
+  } catch (error) {
+    loading.hidden = false;
+    loading.textContent = error.message;
+  }
+}
 // ==========================================
 // PUBLIC FILE SHARING
 // ==========================================
@@ -530,6 +664,26 @@ async function loadExistingShareLinks(fileId) {
 // Share button click handling
 // File action click handling
 document.addEventListener("click", async event => {
+  const newVersionButton = event.target.closest(".new-version-button");
+
+  if (newVersionButton) {
+    uploadNewVersion(
+      newVersionButton.dataset.fileId,
+      newVersionButton.dataset.fileName,
+      newVersionButton
+    );
+    return;
+  }
+  const historyButton = event.target.closest(".history-file-button");
+
+  if (historyButton) {
+    openVersionHistory(
+      historyButton.dataset.fileId,
+      historyButton.dataset.fileName
+    ).catch(error => alert(error.message));
+    return;
+  }
+
   const shareButton = event.target.closest(".share-file-button");
 
   if (shareButton) {
@@ -641,6 +795,19 @@ function createFileRow(file) {
   const actions = document.createElement("div");
   actions.className = "file-actions";
 
+  const history = document.createElement("button");
+  history.type = "button";
+  history.className = "history-file-button";
+  history.textContent = "History";
+  history.dataset.fileId = file.id;
+  history.dataset.fileName = file.display_name || "Untitled file";
+  const newVersion = document.createElement("button");
+  newVersion.type = "button";
+  newVersion.className = "new-version-button";
+  newVersion.textContent = "New Version";
+  newVersion.dataset.fileId = file.id;
+  newVersion.dataset.fileName = file.display_name || "Untitled file";
+
   const download = document.createElement("a");
   download.className = "download-link";
   download.textContent = "Download";
@@ -653,7 +820,11 @@ function createFileRow(file) {
   share.dataset.fileId = file.id;
   share.dataset.fileName = file.display_name || "Untitled file";
 
-  actions.append(download, share);
+  actions.append(history, download, share);
+
+  if (currentUser?.id && file.owner_id === currentUser.id) {
+    actions.append(newVersion);
+  }
 
   if (currentUser?.id && file.owner_id === currentUser.id) {
     const deleteButton = document.createElement("button");
@@ -984,6 +1155,63 @@ async function createFolder() {
   }
 }
 
+async function uploadNewVersion(fileId, fileName, button) {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.hidden = true;
+
+  input.addEventListener("cancel", () => input.remove(), { once: true });
+
+  input.addEventListener("change", async () => {
+    const file = input.files?.[0];
+    input.remove();
+
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    button.disabled = true;
+    button.textContent = "Uploading…";
+
+    try {
+      const idempotencyKey = window.crypto?.randomUUID
+        ? window.crypto.randomUUID()
+        : `version-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+      const data = await apiRequest(
+        `/api/files/${encodeURIComponent(fileId)}/versions`,
+        {
+          method: "POST",
+          headers: { "Idempotency-Key": idempotencyKey },
+          body: formData
+        }
+      );
+
+      await loadDashboard();
+
+      const versionNo = data.version?.version_no;
+      showDashboardMessage(
+        versionNo
+          ? `New version ${versionNo} uploaded successfully.`
+          : data.message || "New version uploaded successfully."
+      );
+
+      await openVersionHistory(fileId, fileName);
+
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      if (button.isConnected) {
+        button.disabled = false;
+        button.textContent = "New Version";
+      }
+    }
+  });
+
+  document.body.appendChild(input);
+  input.click();
+}
 async function uploadSelectedFile(file) {
   if (!file) return;
   const formData = new FormData();
