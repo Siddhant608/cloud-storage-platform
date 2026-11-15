@@ -832,3 +832,99 @@ button { cursor: pointer; }
     padding: 8px 12px;
   }
 }
+/* ==========================================
+   FILE ROW LAYOUT â€” SPACIOUS RESPONSIVE DESIGN
+========================================== */
+
+.file-row {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  grid-template-areas:
+    "icon details version"
+    "actions actions actions";
+  align-items: center;
+  gap: 10px 12px;
+  min-height: unset;
+  padding: 14px 0;
+}
+
+.file-row > .file-type-icon {
+  grid-area: icon;
+}
+
+.file-row > .file-details {
+  grid-area: details;
+  min-width: 0;
+}
+
+.file-row > .file-version {
+  grid-area: version;
+  white-space: nowrap;
+}
+
+.file-row > .file-actions {
+  grid-area: actions;
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  min-width: 0;
+  padding-left: 0;
+}
+
+.file-actions button,
+.file-actions .download-link {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 36px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.file-actions .download-link {
+  border: 1px solid #dce1fa;
+  background: #f7f8ff;
+  color: #4d62e8;
+  text-decoration: none;
+}
+
+.file-actions .download-link:hover {
+  background: #edf0ff;
+  text-decoration: none;
+}
+
+@media (max-width: 520px) {
+  .file-row {
+    grid-template-columns: 35px minmax(0, 1fr);
+    grid-template-areas:
+      "icon details"
+      "actions actions";
+    gap: 9px 8px;
+  }
+
+  .file-row > .file-version {
+    display: none;
+  }
+
+  .file-row > .file-actions {
+    padding-left: 0;
+    gap: 7px;
+  }
+
+  .file-actions button,
+  .file-actions .download-link {
+    min-height: 34px;
+    padding: 7px 10px;
+    font-size: 0.72rem;
+  }
+}
+
+/* END FILE ROW LAYOUT */
