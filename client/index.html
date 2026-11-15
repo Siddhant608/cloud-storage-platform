@@ -97,6 +97,7 @@
           <button class="nav-item" type="button" data-page="files"><span>▤</span>My files</button>
           <button class="nav-item" type="button" data-page="folders"><span>▰</span>Folders</button>
           <button class="nav-item" type="button" data-page="shared"><span>↗</span>Shared</button>
+          <button class="nav-item" type="button" data-page="trash"><span aria-hidden="true">🗑</span>Trash</button>
           <button class="nav-item" type="button" data-page="activity"><span>◷</span>Activity</button>
         </nav>
 
@@ -196,6 +197,21 @@
           <section class="content-card">
             <div class="section-heading"><div><h2>Shared with you</h2><p>Files owned by other workspace members.</p></div></div>
             <div id="shared-list" class="file-list"></div>
+          </section>
+        </section>
+
+        <section id="trash-page" class="page-panel" hidden>
+          <section class="content-card">
+            <div class="section-heading">
+              <div>
+                <h2>Trash</h2>
+                <p>Restore deleted files or permanently remove them.</p>
+              </div>
+              <button type="button" id="refresh-trash-button" class="secondary-button">↻ Refresh</button>
+            </div>
+            <div id="trash-list" class="file-list">
+              <div class="empty-state">Open Trash to load deleted files.</div>
+            </div>
           </section>
         </section>
 

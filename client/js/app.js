@@ -37,6 +37,7 @@ const pageInfo = {
   files: ["My files", "Browse and manage your stored files."],
   folders: ["Folders", "Organize your files into folders."],
   shared: ["Shared", "Files shared with your account."],
+  trash: ["Trash", "Restore deleted files or permanently remove them."],
   activity: ["Activity", "Recent events in your workspace."]
 };
 
@@ -216,7 +217,12 @@ function setPage(page) {
 
   const folderActions = page === "folders" || page === "overview";
   document.querySelector("#create-folder-button").hidden = !folderActions;
-  document.querySelector("#upload-button").hidden = page === "activity";
+  document.querySelector("#upload-button").hidden =
+    page === "activity" || page === "trash";
+
+  if (page === "trash") {
+    loadTrash();
+  }
 }
 
 function formatBytes(value) {
@@ -529,6 +535,58 @@ document.addEventListener("click", async event => {
     return;
   }
 
+  const restoreButton = event.target.closest(".restore-file-button");
+  if (restoreButton) {
+    const fileId = restoreButton.dataset.fileId;
+    const fileName = restoreButton.dataset.fileName;
+
+    if (!confirm(`Restore "${fileName}" to My Files?`)) return;
+
+    restoreButton.disabled = true;
+    try {
+      const data = await apiRequest(
+        `/api/files/${encodeURIComponent(fileId)}/restore`,
+        { method: "PATCH" }
+      );
+      await loadDashboard();
+      await loadTrash();
+      showDashboardMessage(data.message || "File restored successfully.");
+    } catch (error) {
+      alert(error.message);
+      restoreButton.disabled = false;
+    }
+    return;
+  }
+
+  const purgeButton = event.target.closest(".purge-file-button");
+  if (purgeButton) {
+    const fileId = purgeButton.dataset.fileId;
+    const fileName = purgeButton.dataset.fileName;
+
+    if (!confirm(
+      `Permanently delete "${fileName}"? This action cannot be undone and all stored versions will be removed.`
+    )) return;
+
+    purgeButton.disabled = true;
+    try {
+      const data = await apiRequest(
+        `/api/files/${encodeURIComponent(fileId)}/purge`,
+        { method: "DELETE" }
+      );
+      await loadDashboard();
+      await loadTrash();
+
+      const message = data.cleanupPending
+        ? "File permanently deleted. Physical storage cleanup is pending and will be retried."
+        : "File permanently deleted.";
+      showDashboardMessage(message);
+    } catch (error) {
+      alert(error.message);
+      purgeButton.disabled = false;
+    }
+    return;
+  }
+
   const deleteButton = event.target.closest(".delete-file-button");
   if (!deleteButton) return;
 
@@ -614,6 +672,79 @@ function renderFileList(container, files, emptyText) {
     return;
   }
   files.forEach(file => container.append(createFileRow(file)));
+}
+
+function renderTrash(files) {
+  const container = document.querySelector("#trash-list");
+  container.replaceChildren();
+
+  if (!files.length) {
+    container.append(makeEmptyState("Your Trash is empty."));
+    return;
+  }
+
+  files.forEach(file => {
+    const row = document.createElement("article");
+    row.className = "file-row trash-file-row";
+
+    const icon = document.createElement("div");
+    icon.className = "file-type-icon trash-file-icon";
+    icon.textContent = "🗑";
+
+    const details = document.createElement("div");
+    details.className = "file-details";
+
+    const name = document.createElement("strong");
+    name.textContent = file.display_name || "Untitled file";
+
+    const meta = document.createElement("span");
+    meta.textContent =
+      `Deleted ${formatDate(file.deleted_at)} · ${file.version_count || 0} version(s) · ${formatBytes(file.total_size_bytes || 0)}`;
+
+    details.append(name, meta);
+
+    const actions = document.createElement("div");
+    actions.className = "file-actions trash-actions";
+
+    const restore = document.createElement("button");
+    restore.type = "button";
+    restore.className = "restore-file-button";
+    restore.textContent = "↶ Restore";
+    restore.dataset.fileId = file.id;
+    restore.dataset.fileName = file.display_name || "Untitled file";
+
+    const purge = document.createElement("button");
+    purge.type = "button";
+    purge.className = "purge-file-button";
+    purge.textContent = "Delete permanently";
+    purge.dataset.fileId = file.id;
+    purge.dataset.fileName = file.display_name || "Untitled file";
+
+    actions.append(restore, purge);
+    row.append(icon, details, actions);
+    container.append(row);
+  });
+}
+
+async function loadTrash() {
+  const container = document.querySelector("#trash-list");
+  if (!container) return;
+
+  container.replaceChildren();
+  const loading = document.createElement("div");
+  loading.className = "empty-state";
+  loading.textContent = "Loading deleted files…";
+  container.append(loading);
+
+  try {
+    const data = await apiRequest("/api/files/trash");
+    renderTrash(data.files || []);
+  } catch (error) {
+    container.replaceChildren();
+    const message = makeEmptyState(error.message || "Unable to load Trash.");
+    message.classList.add("trash-error");
+    container.append(message);
+  }
 }
 
 function renderFiles() {
@@ -808,6 +939,7 @@ document.querySelector("#upload-button").addEventListener("click", () => fileInp
 fileInput.addEventListener("change", event => uploadSelectedFile(event.target.files[0]));
 document.querySelector("#file-search").addEventListener("input", renderFiles);
 document.querySelector("#file-sort").addEventListener("change", renderFiles);
+document.querySelector("#refresh-trash-button").addEventListener("click", loadTrash);
 
 async function initializeApp() {
   await checkConnection();

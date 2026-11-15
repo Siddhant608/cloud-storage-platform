@@ -1381,6 +1381,274 @@ router.patch("/:id", requireAuth, async (req, res, next) => {
     client?.release();
   }
 });
+// ==========================================
+// TRASH: LIST DELETED FILES
+// GET /api/files/trash
+// ==========================================
+
+router.get("/trash", requireAuth, async (req, res, next) => {
+  try {
+    const result = await pool.query(
+      `SELECT
+         f.id,
+         f.display_name,
+         f.deleted_at,
+         f.created_at,
+         f.updated_at,
+         COALESCE(v.version_count, 0)::int AS version_count,
+         COALESCE(v.total_size_bytes, 0)::text AS total_size_bytes
+       FROM files f
+       LEFT JOIN LATERAL (
+         SELECT
+           COUNT(*) AS version_count,
+           SUM(size_bytes) AS total_size_bytes
+         FROM file_versions
+         WHERE file_id = f.id
+       ) v ON TRUE
+       WHERE f.owner_id = $1
+         AND f.deleted_at IS NOT NULL
+         AND f.purged_at IS NULL
+       ORDER BY f.deleted_at DESC`,
+      [req.userId]
+    );
+
+    return res.json({ files: result.rows });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+
+// ==========================================
+// RESTORE FILE
+// PATCH /api/files/:id/restore
+// ==========================================
+
+router.patch("/:id/restore", requireAuth, async (req, res, next) => {
+  let client;
+
+  try {
+    const fileId = req.params.id;
+
+    if (!UUID_RE.test(fileId)) {
+      throw fail(400, "Invalid file ID.");
+    }
+
+    client = await pool.connect();
+    await client.query("BEGIN");
+
+    const existing = await client.query(
+      `SELECT id, display_name
+       FROM files
+       WHERE id = $1
+         AND owner_id = $2
+         AND deleted_at IS NOT NULL
+         AND purged_at IS NULL
+       FOR UPDATE`,
+      [fileId, req.userId]
+    );
+
+    if (existing.rowCount !== 1) {
+      throw fail(404, "Deleted file not found.");
+    }
+
+    await client.query(
+      `UPDATE files
+       SET deleted_at = NULL,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [fileId]
+    );
+
+    await client.query(
+      `INSERT INTO activity_logs
+         (actor_user_id, action, file_id, metadata)
+       VALUES ($1, 'FILE_RESTORED', $2, $3::jsonb)`,
+      [
+        req.userId,
+        fileId,
+        JSON.stringify({
+          fileName: existing.rows[0].display_name
+        })
+      ]
+    );
+
+    await client.query("COMMIT");
+
+    return res.json({
+      message: "File restored successfully.",
+      fileId
+    });
+  } catch (error) {
+    if (client) {
+      await client.query("ROLLBACK").catch(() => {});
+    }
+    return next(error);
+  } finally {
+    client?.release();
+  }
+});
+
+
+// ==========================================
+// PERMANENTLY PURGE FILE
+// DELETE /api/files/:id/purge
+// ==========================================
+
+
+router.delete("/:id/purge", requireAuth, async (req, res, next) => {
+  let client;
+  let inTransaction = false;
+  let committed = false;
+  let purgeJobId;
+
+  try {
+    const fileId = req.params.id;
+
+    if (!UUID_RE.test(fileId)) {
+      throw fail(400, "Invalid file ID.");
+    }
+
+    client = await pool.connect();
+
+    await client.query("BEGIN");
+    inTransaction = true;
+
+    const existing = await client.query(
+      `SELECT id, owner_id, display_name
+       FROM files
+       WHERE id = $1
+         AND owner_id = $2
+         AND deleted_at IS NOT NULL
+         AND purged_at IS NULL
+       FOR UPDATE`,
+      [fileId, req.userId]
+    );
+
+    if (existing.rowCount !== 1) {
+      throw fail(404, "Deleted file not found.");
+    }
+
+    const fileName = existing.rows[0].display_name;
+
+    // Read immutable version metadata.
+    // Version rows are never deleted or modified.
+    const versions = await client.query(
+      `SELECT blob_key, size_bytes
+       FROM file_versions
+       WHERE file_id = $1`,
+      [fileId]
+    );
+
+    const totalBytes = versions.rows.reduce(
+      (total, version) => total + BigInt(version.size_bytes),
+      0n
+    );
+
+    // Create a durable cleanup job BEFORE committing the purge.
+    const job = await client.query(
+      `INSERT INTO file_purge_jobs
+         (file_id, owner_id, blob_keys, total_bytes)
+       VALUES ($1, $2, $3::jsonb, $4::bigint)
+       RETURNING id`,
+      [
+        fileId,
+        req.userId,
+        JSON.stringify(versions.rows.map(v => v.blob_key)),
+        totalBytes.toString()
+      ]
+    );
+
+    purgeJobId = job.rows[0].id;
+
+    // Keep the file tombstone and immutable version history.
+    await client.query(
+      `UPDATE files
+       SET purged_at = NOW(),
+           updated_at = NOW()
+       WHERE id = $1`,
+      [fileId]
+    );
+
+    // Release quota exactly once, in the same transaction.
+    const quotaUpdate = await client.query(
+      `UPDATE storage_usage
+       SET used_bytes = used_bytes - $1::bigint
+       WHERE user_id = $2
+         AND used_bytes >= $1::bigint
+       RETURNING user_id`,
+      [totalBytes.toString(), req.userId]
+    );
+
+    if (quotaUpdate.rowCount !== 1) {
+      throw fail(500, "Storage quota could not be updated safely.");
+    }
+
+    await client.query(
+      `INSERT INTO activity_logs
+         (actor_user_id, action, file_id, metadata)
+       VALUES ($1, 'FILE_PURGED', $2, $3::jsonb)`,
+      [
+        req.userId,
+        fileId,
+        JSON.stringify({
+          fileName,
+          versionCount: versions.rowCount,
+          totalBytes: totalBytes.toString(),
+          purgeJobId
+        })
+      ]
+    );
+
+    await client.query("COMMIT");
+    inTransaction = false;
+    committed = true;
+
+    // Physical cleanup happens after the database commit.
+    // If it fails, the durable job remains pending for recovery.
+    let cleanupPending = false;
+
+    try {
+      const { processPurgeJob } = await import(
+        "../services/purgeRecovery.js"
+      );
+
+      await processPurgeJob(pool, purgeJobId);
+    } catch (cleanupError) {
+      cleanupPending = true;
+      console.error(
+        `Physical purge cleanup pending for job ${purgeJobId}:`,
+        cleanupError.message
+      );
+    }
+
+    return res.json({
+      message: cleanupPending
+        ? "File purged. Physical storage cleanup is pending."
+        : "File permanently deleted.",
+      fileId,
+      versionsPurged: versions.rowCount,
+      bytesReleased: totalBytes.toString(),
+      cleanupPending,
+      purgeJobId
+    });
+
+  } catch (error) {
+    if (client && inTransaction) {
+      await client.query("ROLLBACK").catch(() => {});
+      inTransaction = false;
+    }
+
+    // Never roll back filesystem cleanup after the DB commit.
+    if (committed) {
+      console.error("Error after permanent purge commit:", error);
+    }
+
+    return next(error);
+  } finally {
+    client?.release();
+  }
+});
 
 
 // ==========================================
@@ -1439,6 +1707,14 @@ router.delete("/:id", requireAuth, async (req, res, next) => {
          AND revoked_at IS NULL`,
       [fileId]
     );
+    // Revoke all active public share links too.
+await client.query(
+  `UPDATE share_links
+   SET revoked_at = NOW()
+   WHERE file_id = $1
+     AND revoked_at IS NULL`,
+  [fileId]
+);
 
     await client.query(
       `INSERT INTO activity_logs

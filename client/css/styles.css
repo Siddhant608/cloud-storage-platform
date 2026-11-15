@@ -441,3 +441,81 @@ button { cursor: pointer; }
     font-size: .68rem;
   }
 }
+
+/* Trash page */
+.trash-file-row {
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  padding: 10px 0;
+}
+
+.trash-file-icon {
+  color: #b84b55;
+  background: #fff0f1;
+}
+
+.trash-actions {
+  justify-content: flex-end;
+}
+
+.restore-file-button,
+.purge-file-button {
+  min-height: 34px;
+  padding: 7px 11px;
+  border: 1px solid #dfe4ee;
+  border-radius: 7px;
+  background: #fff;
+  color: #4d5b75;
+  font-size: .75rem;
+  font-weight: 700;
+}
+
+.restore-file-button {
+  border-color: #cfe9dc;
+  color: #18734f;
+  background: #f0faf4;
+}
+
+.restore-file-button:hover {
+  background: #e2f5e9;
+}
+
+.purge-file-button {
+  border-color: #f0cccc;
+  color: #b52d39;
+  background: #fff4f4;
+}
+
+.purge-file-button:hover {
+  background: #ffe7e8;
+}
+
+.restore-file-button:disabled,
+.purge-file-button:disabled {
+  opacity: .55;
+  cursor: wait;
+}
+
+.trash-error {
+  color: #b52d39;
+}
+
+@media (max-width: 700px) {
+  .trash-file-row {
+    grid-template-columns: 35px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .trash-actions {
+    grid-column: 2;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 520px) {
+  .restore-file-button,
+  .purge-file-button {
+    padding: 7px 8px;
+    font-size: .68rem;
+  }
+}
