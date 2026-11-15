@@ -31,6 +31,7 @@ let currentUser = null;
 let allFiles = [];
 let allFolders = [];
 let currentPage = "overview";
+let currentFolderId = null;
 
 const pageInfo = {
   overview: ["Overview", "Your files and storage at a glance."],
@@ -222,6 +223,10 @@ function setPage(page) {
 
   if (page === "trash") {
     loadTrash();
+  }
+
+  if (page === "folders") {
+    renderFolders();
   }
 }
 
@@ -765,25 +770,119 @@ function renderFiles() {
 
 function renderFolders() {
   const container = document.querySelector("#folders-list");
+  const breadcrumbs = document.querySelector("#folder-breadcrumbs");
+  const filesContainer = document.querySelector("#folder-files-list");
+
   container.replaceChildren();
-  if (!allFolders.length) {
-    container.append(makeEmptyState("No folders yet. Create a folder to organize your files."));
-    return;
+  breadcrumbs.replaceChildren();
+
+  // Root breadcrumb.
+  const rootButton = document.createElement("button");
+  rootButton.type = "button";
+  rootButton.className = "breadcrumb-button";
+  rootButton.textContent = "My folders";
+  rootButton.addEventListener("click", () => {
+    currentFolderId = null;
+    renderFolders();
+  });
+  breadcrumbs.append(rootButton);
+
+  // Build the current folder path.
+  const path = [];
+  let current = allFolders.find(folder => folder.id === currentFolderId);
+  let safetyCounter = 0;
+
+  while (current && safetyCounter++ < allFolders.length) {
+    path.unshift(current);
+    current = allFolders.find(
+      folder => folder.id === current.parent_folder_id
+    );
   }
 
-  allFolders.forEach(folder => {
-    const card = document.createElement("article");
-    card.className = "folder-card";
-    const icon = document.createElement("span");
-    icon.className = "folder-card-icon";
-    icon.textContent = "▰";
-    const name = document.createElement("strong");
-    name.textContent = folder.folder_name || "Untitled folder";
-    const date = document.createElement("span");
-    date.textContent = `Created ${formatDate(folder.created_at)}`;
-    card.append(icon, name, date);
-    container.append(card);
+  // If the selected folder is no longer available, return to root.
+  if (currentFolderId && !path.length) {
+    currentFolderId = null;
+  }
+
+  path.forEach(folder => {
+    const separator = document.createElement("span");
+    separator.className = "breadcrumb-separator";
+    separator.textContent = "/";
+    breadcrumbs.append(separator);
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "breadcrumb-button";
+    button.textContent = folder.folder_name;
+    button.addEventListener("click", () => {
+      currentFolderId = folder.id;
+      renderFolders();
+    });
+    breadcrumbs.append(button);
   });
+
+  // Display only immediate child folders.
+  const childFolders = allFolders.filter(
+    folder => (folder.parent_folder_id || null) === currentFolderId
+  );
+
+  if (!childFolders.length) {
+    container.append(
+      makeEmptyState(
+        currentFolderId
+          ? "No subfolders here. You can create one using New Folder."
+          : "No folders yet. Create a folder to organize your files."
+      )
+    );
+  } else {
+    childFolders.forEach(folder => {
+      const card = document.createElement("article");
+      card.className = "folder-card folder-open-card";
+      card.tabIndex = 0;
+      card.setAttribute("role", "button");
+      card.setAttribute("aria-label", `Open folder ${folder.folder_name}`);
+
+      const icon = document.createElement("span");
+      icon.className = "folder-card-icon";
+      icon.textContent = "📁";
+
+      const name = document.createElement("strong");
+      name.textContent = folder.folder_name || "Untitled folder";
+
+      const date = document.createElement("span");
+      date.textContent = `Created ${formatDate(folder.created_at)}`;
+
+      card.append(icon, name, date);
+
+      const openFolder = () => {
+        currentFolderId = folder.id;
+        renderFolders();
+      };
+
+      card.addEventListener("click", openFolder);
+      card.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          openFolder();
+        }
+      });
+
+      container.append(card);
+    });
+  }
+
+  // Display files belonging only to this folder.
+  const folderFiles = allFiles.filter(
+    file => (file.folder_id || null) === currentFolderId
+  );
+
+  renderFileList(
+    filesContainer,
+    folderFiles,
+    currentFolderId
+      ? "This folder has no files yet. Use Upload file to add one."
+      : "No files in the root directory. Open a folder or upload a file here."
+  );
 }
 
 function renderActivity(activities) {
@@ -875,7 +974,7 @@ async function createFolder() {
   try {
     const data = await apiRequest("/api/folders", {
       method: "POST",
-      body: JSON.stringify({ folderName: folderName.trim() })
+      body: JSON.stringify({ folderName: folderName.trim(), parentFolderId: currentPage === "folders" ? currentFolderId : null })
     });
     showDashboardMessage(data.message || "Folder created successfully.");
     await loadDashboard();
@@ -889,6 +988,10 @@ async function uploadSelectedFile(file) {
   if (!file) return;
   const formData = new FormData();
   formData.append("file", file);
+
+  if (currentPage === "folders" && currentFolderId) {
+    formData.append("folderId", currentFolderId);
+  }
 
   const uploadButton = document.querySelector("#upload-button");
   uploadButton.disabled = true;
@@ -907,7 +1010,7 @@ async function uploadSelectedFile(file) {
 
     showDashboardMessage(data.message || "File uploaded successfully.");
     await loadDashboard();
-    setPage("files");
+    setPage(currentPage === "folders" ? "folders" : "files");
   } catch (error) {
     showDashboardMessage(error.message, true);
   } finally {

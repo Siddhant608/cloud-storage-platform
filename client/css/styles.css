@@ -519,3 +519,53 @@ button { cursor: pointer; }
     font-size: .68rem;
   }
 }
+
+/* Folder navigation */
+.folder-breadcrumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin: 18px 0;
+  color: #929bad;
+  font-size: 0.85rem;
+}
+
+.breadcrumb-button {
+  border: 0;
+  background: transparent;
+  color: #5368a5;
+  cursor: pointer;
+  font: inherit;
+  padding: 4px 2px;
+}
+
+.breadcrumb-button:hover {
+  text-decoration: underline;
+}
+
+.breadcrumb-separator {
+  color: #aab2c0;
+}
+
+.folder-open-card {
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.folder-open-card:hover,
+.folder-open-card:focus-visible {
+  border-color: #8da1d7;
+  outline: none;
+  transform: translateY(-2px);
+}
+
+.folder-files-section {
+  margin-top: 28px;
+}
+
+.folder-files-section h3 {
+  margin: 0 0 14px;
+  color: #354158;
+  font-size: 0.95rem;
+}

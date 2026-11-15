@@ -154,19 +154,35 @@ async function finalizeQuota(client, userId, bytes) {
 // Check file ownership or sharing permission
 async function fileAccess(fileId, userId, db = pool) {
   const result = await db.query(
-    `SELECT f.id, f.owner_id, f.display_name,
-            CASE
-              WHEN f.owner_id = $2 THEN 'owner'
-              ELSE s.role
-            END AS role
+    `SELECT
+       f.id,
+       f.owner_id,
+       f.folder_id,
+       f.display_name,
+       CASE
+         WHEN f.owner_id = $2 THEN 'owner'
+         WHEN folder.owner_id = $2 THEN 'owner'
+         WHEN fm.role IS NOT NULL THEN fm.role
+         ELSE s.role
+       END AS role
      FROM files f
      LEFT JOIN file_shares s
        ON s.file_id = f.id
       AND s.shared_with_user_id = $2
       AND s.revoked_at IS NULL
+     LEFT JOIN folders folder
+       ON folder.id = f.folder_id
+     LEFT JOIN folder_members fm
+       ON fm.folder_id = f.folder_id
+      AND fm.user_id = $2
      WHERE f.id = $1
        AND f.deleted_at IS NULL
-       AND (f.owner_id = $2 OR s.id IS NOT NULL)
+       AND (
+         f.owner_id = $2
+         OR s.id IS NOT NULL
+         OR folder.owner_id = $2
+         OR fm.user_id = $2
+       )
      LIMIT 1`,
     [fileId, userId]
   );
@@ -477,12 +493,48 @@ router.post("/", requireAuth, receiveFile, async (req, res, next) => {
     const bytes = req.file.size;
     const checksum = await sha256(req.file.path);
 
+    // A file can be uploaded to the root or to an accessible folder.
+    const rawFolderId = req.body?.folderId;
+    const folderId = rawFolderId ? String(rawFolderId).trim() : null;
+
+    if (folderId && !UUID_RE.test(folderId)) {
+      throw fail(400, "Invalid folder ID.");
+    }
+
+    if (folderId) {
+      const folderAccess = await pool.query(
+        `SELECT
+           f.id,
+           CASE
+             WHEN f.owner_id = $2 THEN 'owner'
+             ELSE fm.role
+           END AS role
+         FROM folders f
+         LEFT JOIN folder_members fm
+           ON fm.folder_id = f.id
+          AND fm.user_id = $2
+         WHERE f.id = $1
+           AND (f.owner_id = $2 OR fm.user_id = $2)
+         LIMIT 1`,
+        [folderId, userId]
+      );
+
+      if (!folderAccess.rows.length) {
+        throw fail(404, "Folder not found or you do not have access.");
+      }
+
+      if (folderAccess.rows[0].role === "viewer") {
+        throw fail(403, "You need editor permission to upload into this folder.");
+      }
+    }
+
     // Require an idempotency key for each logical upload.
     const key = getIdempotencyKey(req);
 
     const fingerprint = uploadFingerprint({
       operation: "create-file",
       displayName: name,
+      folderId,
       sizeBytes: bytes,
       checksum
     });
@@ -521,10 +573,10 @@ router.post("/", requireAuth, receiveFile, async (req, res, next) => {
 
     // Create logical file record.
     const fileResult = await client.query(
-      `INSERT INTO files (owner_id, display_name)
-       VALUES ($1, $2)
-       RETURNING id, owner_id, display_name, created_at`,
-      [userId, name]
+      `INSERT INTO files (owner_id, folder_id, display_name)
+       VALUES ($1, $2, $3)
+       RETURNING id, owner_id, folder_id, display_name, created_at`,
+      [userId, folderId, name]
     );
 
     const file = fileResult.rows[0];
@@ -593,6 +645,19 @@ router.post("/", requireAuth, receiveFile, async (req, res, next) => {
       await markUploadRequestFailed(requestId, attemptToken).catch(() => {});
     }
 
+    // Convert duplicate filename violations into a user-friendly response.
+    if (
+      error.code === "23505" &&
+      [
+        "unique_active_root_file_name",
+        "unique_active_folder_file_name"
+      ].includes(error.constraint)
+    ) {
+      error.statusCode = 409;
+      error.message =
+        "A file with this name already exists in this location. Use Upload New Version instead.";
+    }
+
     return next(error);
 
   } finally {
@@ -631,7 +696,22 @@ router.get("/", requireAuth, async (req, res, next) => {
          LIMIT 1
        ) latest ON TRUE
        WHERE f.deleted_at IS NULL
-         AND (f.owner_id = $1 OR s.id IS NOT NULL)
+         AND (
+           f.owner_id = $1
+           OR s.id IS NOT NULL
+           OR EXISTS (
+             SELECT 1
+             FROM folders folder
+             WHERE folder.id = f.folder_id
+               AND folder.owner_id = $1
+           )
+           OR EXISTS (
+             SELECT 1
+             FROM folder_members fm
+             WHERE fm.folder_id = f.folder_id
+               AND fm.user_id = $1
+           )
+         )
        ORDER BY f.updated_at DESC`,
       [req.userId]
     );
