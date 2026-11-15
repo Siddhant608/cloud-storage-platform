@@ -155,7 +155,20 @@ button { cursor: pointer; }
   .feature-list { grid-template-columns: 1fr 1fr; }
   .dashboard-view { display: block; }
   .sidebar { min-height: 0; padding: 14px 0; border-right: 0; border-bottom: 1px solid #e5e9f2; }
-  .sidebar-heading, .sidebar-bottom { display: none; }
+  .sidebar-heading { display: none; }
+  .sidebar-bottom {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 10px;
+    padding-top: 10px;
+  }
+  .profile-card { display: none; }
+  .logout-button {
+    display: block;
+    width: auto;
+    min-width: 104px;
+    padding: 10px 16px;
+  }
   .side-nav { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 2px; }
   .nav-item { width: auto; flex: 0 0 auto; padding: 10px 12px; font-size: .78rem; }
   .nav-item span { width: auto; }
