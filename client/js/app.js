@@ -32,6 +32,11 @@ let allFiles = [];
 let allFolders = [];
 let currentPage = "overview";
 let currentFolderId = null;
+let activityItems = [];
+let activityOffset = 0;
+let activityHasMore = false;
+let activityCategory = "all";
+let activityLoading = false;
 
 const pageInfo = {
   overview: ["Overview", "Your files and storage at a glance."],
@@ -227,6 +232,10 @@ function setPage(page) {
 
   if (page === "folders") {
     renderFolders();
+  }
+
+  if (page === "activity") {
+    loadActivity({ reset: true });
   }
 }
 
@@ -664,6 +673,46 @@ async function loadExistingShareLinks(fileId) {
 // Share button click handling
 // File action click handling
 document.addEventListener("click", async event => {
+  const folderDeleteButton = event.target.closest(".delete-folder-button");
+
+  if (folderDeleteButton) {
+    const folderId = folderDeleteButton.dataset.folderId;
+    const folderName = folderDeleteButton.dataset.folderName;
+
+    const confirmed = confirm(
+      `Delete folder "${folderName}" and all its subfolders?\n\n` +
+      `All active files you own inside this folder tree will be moved to Trash. ` +
+      `Their versions will remain intact.\n\n` +
+      `The folder structure will be permanently removed. If you restore these files later, ` +
+      `they will appear in My Files (root), because their original folders will no longer exist.\n\n` +
+      `This action cannot be undone for the folder structure.`
+    );
+
+    if (!confirmed) return;
+
+    folderDeleteButton.disabled = true;
+
+    try {
+      const data = await apiRequest(
+        `/api/folders/${encodeURIComponent(folderId)}`,
+        { method: "DELETE" }
+      );
+
+      await loadDashboard();
+      await loadTrash();
+
+      const count = Number(data.trashedFileCount || 0);
+
+      showDashboardMessage(
+        data.message || `Folder deleted. ${count} files moved to Trash.`
+      );
+    } catch (error) {
+      alert(error.message);
+      folderDeleteButton.disabled = false;
+    }
+
+    return;
+  }
   const newVersionButton = event.target.closest(".new-version-button");
 
   if (newVersionButton) {
@@ -1009,9 +1058,14 @@ function renderFolders() {
     childFolders.forEach(folder => {
       const card = document.createElement("article");
       card.className = "folder-card folder-open-card";
-      card.tabIndex = 0;
-      card.setAttribute("role", "button");
-      card.setAttribute("aria-label", `Open folder ${folder.folder_name}`);
+
+      const openButton = document.createElement("button");
+      openButton.type = "button";
+      openButton.className = "folder-open-button";
+      openButton.setAttribute(
+        "aria-label",
+        `Open folder ${folder.folder_name}`
+      );
 
       const icon = document.createElement("span");
       icon.className = "folder-card-icon";
@@ -1023,20 +1077,30 @@ function renderFolders() {
       const date = document.createElement("span");
       date.textContent = `Created ${formatDate(folder.created_at)}`;
 
-      card.append(icon, name, date);
+      openButton.append(icon, name, date);
 
-      const openFolder = () => {
+      openButton.addEventListener("click", () => {
         currentFolderId = folder.id;
         renderFolders();
-      };
-
-      card.addEventListener("click", openFolder);
-      card.addEventListener("keydown", event => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          openFolder();
-        }
       });
+
+      card.append(openButton);
+
+      // Only folder owners can see the delete button.
+      if (folder.role === "owner") {
+        const deleteButton = document.createElement("button");
+        deleteButton.type = "button";
+        deleteButton.className = "delete-folder-button";
+        deleteButton.dataset.folderId = folder.id;
+        deleteButton.dataset.folderName = folder.folder_name || "Untitled folder";
+        deleteButton.textContent = "Delete Folder";
+        deleteButton.setAttribute(
+          "aria-label",
+          `Delete folder ${folder.folder_name}`
+        );
+
+        card.append(deleteButton);
+      }
 
       container.append(card);
     });
@@ -1056,31 +1120,172 @@ function renderFolders() {
   );
 }
 
+function activityActionLabel(action) {
+  const labels = {
+    VERSION_CREATED: "New file version uploaded",
+    FILE_DOWNLOADED: "File downloaded",
+    FILE_RENAMED: "File renamed",
+    FILE_DELETED: "File moved to Trash",
+    FILE_PURGED: "File permanently deleted",
+    FILE_RESTORED: "File restored",
+    FILE_SHARED: "File shared",
+    SHARE_REVOKED: "File access revoked",
+    SHARE_LINK_CREATED: "Share link created",
+    SHARE_LINK_REVOKED: "Share link revoked",
+    FOLDER_CREATED: "Folder created",
+    FOLDER_RENAMED: "Folder renamed",
+    FOLDER_DELETED: "Folder deleted"
+  };
+
+  return labels[action] || "Workspace activity";
+}
+
 function renderActivity(activities) {
   const container = document.querySelector("#activity-list");
   container.replaceChildren();
+
   if (!activities.length) {
-    container.append(makeEmptyState("No recent activity to show."));
+    container.append(makeEmptyState("No activity found for this category."));
     return;
   }
 
   activities.forEach(item => {
+    const metadata = typeof item.metadata === "string"
+      ? (() => {
+          try { return JSON.parse(item.metadata); }
+          catch { return {}; }
+        })()
+      : (item.metadata || {});
+
     const row = document.createElement("article");
     row.className = "activity-row";
+
     const dot = document.createElement("span");
     dot.className = "activity-dot";
+
     const copy = document.createElement("div");
     copy.className = "activity-copy";
+
     const action = document.createElement("strong");
-    action.textContent = item.action || item.action_type || item.event_type || item.activity_type || "Workspace activity";
+    action.textContent = activityActionLabel(item.action);
+
     const detail = document.createElement("span");
-    detail.textContent = item.display_name || item.file_name || item.description || item.target_name || "";
+
+    const targetName =
+      item.display_name ||
+      metadata.fileName ||
+      metadata.folderName ||
+      metadata.newName ||
+      metadata.targetName ||
+      "";
+
+    const details = [];
+
+    if (targetName) details.push(targetName);
+
+    const versionNo = item.version_no || metadata.versionNo;
+    if (versionNo) details.push(`Version ${versionNo}`);
+
+    if (metadata.oldName && metadata.newName) {
+      details.push(`${metadata.oldName} → ${metadata.newName}`);
+    }
+
+    if (metadata.trashedFileCount !== undefined) {
+      details.push(`${metadata.trashedFileCount} file(s) moved to Trash`);
+    }
+
+    if (metadata.deletedFolderCount !== undefined) {
+      details.push(`${metadata.deletedFolderCount} folder(s) deleted`);
+    }
+
+    if (metadata.downloadType === "authenticated") {
+      details.push("Authenticated download");
+    }
+
+    detail.textContent = [
+      item.actor_name || "You",
+      ...details
+    ].join(" · ");
+
     const date = document.createElement("time");
-    date.textContent = formatDate(item.created_at || item.occurred_at);
+    const timestamp = item.occurred_at ? new Date(item.occurred_at) : null;
+
+    date.textContent = timestamp && !Number.isNaN(timestamp.getTime())
+      ? timestamp.toLocaleString()
+      : "Date unavailable";
+
+    if (timestamp && !Number.isNaN(timestamp.getTime())) {
+      date.dateTime = timestamp.toISOString();
+    }
+
     copy.append(action, detail);
     row.append(dot, copy, date);
     container.append(row);
   });
+}
+
+async function loadActivity({ reset = true } = {}) {
+  if (activityLoading) return;
+
+  if (reset) {
+    activityOffset = 0;
+    activityHasMore = false;
+    activityItems = [];
+  }
+
+  activityLoading = true;
+
+  const status = document.querySelector("#activity-status");
+  const loadMoreButton = document.querySelector("#activity-load-more");
+  const refreshButton = document.querySelector("#refresh-activity-button");
+
+  status.textContent = reset ? "Loading activity..." : "Loading more activity...";
+  loadMoreButton.disabled = true;
+  refreshButton.disabled = true;
+
+  if (reset) {
+    renderActivity([]);
+    document.querySelector("#activity-list").firstChild.textContent =
+      "Loading activity...";
+  }
+
+  try {
+    const query = new URLSearchParams({
+      limit: "20",
+      offset: String(activityOffset),
+      category: activityCategory
+    });
+
+    const data = await apiRequest(`/api/activity?${query.toString()}`);
+    const received = data.activities || [];
+
+    activityItems = reset
+      ? received
+      : [...activityItems, ...received];
+
+    activityOffset += received.length;
+    activityHasMore = Boolean(data.pagination?.hasMore);
+
+    renderActivity(activityItems);
+
+    status.textContent = activityItems.length
+      ? `Showing ${activityItems.length} activity event(s).`
+      : "No activity found for this category.";
+
+    loadMoreButton.hidden = !activityHasMore;
+  } catch (error) {
+    status.textContent = `Unable to load activity: ${error.message}`;
+
+    if (!activityItems.length) {
+      renderActivity([]);
+      document.querySelector("#activity-list").firstChild.textContent =
+        "Activity could not be loaded. Use Refresh to try again.";
+    }
+  } finally {
+    activityLoading = false;
+    loadMoreButton.disabled = false;
+    refreshButton.disabled = false;
+  }
 }
 
 async function loadDashboard() {
@@ -1270,6 +1475,28 @@ document.querySelector("#upload-button").addEventListener("click", () => fileInp
 fileInput.addEventListener("change", event => uploadSelectedFile(event.target.files[0]));
 document.querySelector("#file-search").addEventListener("input", renderFiles);
 document.querySelector("#file-sort").addEventListener("change", renderFiles);
+document.querySelectorAll("[data-activity-category]").forEach(button => {
+  button.addEventListener("click", () => {
+    activityCategory = button.dataset.activityCategory;
+
+    document.querySelectorAll("[data-activity-category]").forEach(filter => {
+      filter.classList.toggle(
+        "active",
+        filter.dataset.activityCategory === activityCategory
+      );
+    });
+
+    loadActivity({ reset: true });
+  });
+});
+
+document.querySelector("#refresh-activity-button").addEventListener("click", () => {
+  loadActivity({ reset: true });
+});
+
+document.querySelector("#activity-load-more").addEventListener("click", () => {
+  loadActivity({ reset: false });
+});
 document.querySelector("#refresh-trash-button").addEventListener("click", loadTrash);
 
 async function initializeApp() {

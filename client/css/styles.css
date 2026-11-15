@@ -659,3 +659,176 @@ button { cursor: pointer; }
   opacity: 0.6;
   cursor: wait;
 }
+
+/* ==========================================
+   FOLDER DELETE ACTION
+========================================== */
+
+.folder-open-card {
+  cursor: default;
+}
+
+.folder-open-button {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.folder-open-button:focus-visible {
+  outline: 2px solid #8795ed;
+  outline-offset: 4px;
+  border-radius: 5px;
+}
+
+.delete-folder-button {
+  justify-self: start;
+  margin-top: 5px;
+  padding: 7px 11px;
+  border: 1px solid #f0caca;
+  border-radius: 7px;
+  background: #fff7f7;
+  color: #bd4141;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.delete-folder-button:hover {
+  background: #ffeaea;
+  border-color: #df9999;
+}
+
+.delete-folder-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+
+/* ==========================================
+   ACTIVITY PAGE ENHANCEMENTS
+========================================== */
+
+.activity-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin: 22px 0 12px;
+}
+
+.activity-filter {
+  border: 1px solid #e4e8f0;
+  border-radius: 9px;
+  padding: 9px 16px;
+  background: #fff;
+  color: #68748a;
+  font-size: .8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .2s, color .2s, border-color .2s;
+}
+
+.activity-filter:hover {
+  border-color: #697be8;
+  color: #5366d8;
+}
+
+.activity-filter.active {
+  background: #eef0ff;
+  border-color: #697be8;
+  color: #5366d8;
+}
+
+.activity-status {
+  min-height: 20px;
+  margin: 12px 0;
+  color: #929bad;
+  font-size: .78rem;
+}
+
+.activity-list {
+  display: grid;
+  gap: 0;
+}
+
+.activity-row {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+  min-height: 70px;
+  padding: 12px 4px;
+  border-top: 1px solid #eff1f5;
+}
+
+.activity-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #697be8;
+}
+
+.activity-copy {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.activity-copy strong {
+  color: #354158;
+  font-size: .84rem;
+  font-weight: 650;
+}
+
+.activity-copy span {
+  color: #929bad;
+  font-size: .75rem;
+  overflow-wrap: anywhere;
+}
+
+.activity-row time {
+  color: #929bad;
+  font-size: .72rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.activity-load-more-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+#activity-load-more {
+  min-width: 130px;
+}
+
+.activity-filter:focus-visible,
+#activity-load-more:focus-visible,
+#refresh-activity-button:focus-visible {
+  outline: 3px solid rgba(105, 123, 232, .25);
+  outline-offset: 2px;
+}
+
+@media (max-width: 700px) {
+  .activity-row {
+    grid-template-columns: 10px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .activity-row time {
+    grid-column: 2;
+    text-align: left;
+    font-size: .68rem;
+  }
+
+  .activity-filter {
+    padding: 8px 12px;
+  }
+}

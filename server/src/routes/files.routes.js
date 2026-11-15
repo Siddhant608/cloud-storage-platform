@@ -1335,7 +1335,7 @@ router.get(
       }
 
       const result = await pool.query(
-        `SELECT blob_key
+        `SELECT id, blob_key
          FROM file_versions
          WHERE file_id = $1 AND version_no = $2`,
         [req.params.id, versionNo]
@@ -1353,9 +1353,30 @@ router.get(
         diskPath,
         access.display_name,
         (error) => {
-          if (error && !res.headersSent) {
-            next(error);
+          if (error) {
+            if (!res.headersSent) {
+              next(error);
+            }
+            return;
           }
+
+          // The callback runs after the download transfer completes.
+          pool.query(
+            `INSERT INTO activity_logs
+               (actor_user_id, action, file_id, version_id, metadata)
+             VALUES ($1, 'FILE_DOWNLOADED', $2, $3, $4::jsonb)`,
+            [
+              req.userId,
+              req.params.id,
+              result.rows[0].id,
+              JSON.stringify({
+                versionNo,
+                downloadType: "authenticated"
+              })
+            ]
+          ).catch(logError => {
+            console.error("Failed to record file download activity:", logError);
+          });
         }
       );
 
