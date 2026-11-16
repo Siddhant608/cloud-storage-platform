@@ -104,6 +104,23 @@ async function sha256(filePath) {
 
   return hash.digest("hex");
 }
+// Verify stored blob integrity before allowing a download.
+async function verifyBlobIntegrity(filePath, expectedChecksum) {
+  if (
+    typeof expectedChecksum !== "string" ||
+    !/^[a-f0-9]{64}$/i.test(expectedChecksum)
+  ) {
+    console.error("Missing or invalid stored SHA-256 checksum.");
+    throw fail(500, "File integrity verification failed. Download blocked.");
+  }
+
+  const actualChecksum = await sha256(filePath);
+
+  if (actualChecksum !== expectedChecksum.toLowerCase()) {
+    console.error("File integrity verification failed. Download blocked.");
+    throw fail(500, "File integrity verification failed. Download blocked.");
+  }
+}
 
 // Reserve storage quota atomically
 async function reserveQuota(userId, bytes) {
@@ -1335,7 +1352,7 @@ router.get(
       }
 
       const result = await pool.query(
-        `SELECT id, blob_key
+        `SELECT id, blob_key, checksum_sha256
          FROM file_versions
          WHERE file_id = $1 AND version_no = $2`,
         [req.params.id, versionNo]
@@ -1348,7 +1365,10 @@ router.get(
       const diskPath = blobPathFor(result.rows[0].blob_key);
 
       await fs.access(diskPath);
-
+      await verifyBlobIntegrity(
+       diskPath,
+       result.rows[0].checksum_sha256
+      );
       return res.download(
         diskPath,
         access.display_name,
@@ -2459,7 +2479,7 @@ router.get("/public/:token/download", async (req, res, next) => {
     }
 
     const result = await pool.query(
-      `SELECT blob_key
+      `SELECT blob_key, checksum_sha256
        FROM file_versions
        WHERE file_id = $1
        ORDER BY version_no DESC
@@ -2474,6 +2494,8 @@ router.get("/public/:token/download", async (req, res, next) => {
     const diskPath = blobPathFor(result.rows[0].blob_key);
 
     await fs.access(diskPath);
+
+    await verifyBlobIntegrity(diskPath, result.rows[0].checksum_sha256);
 
     return res.download(diskPath, link.display_name);
   } catch (error) {
@@ -2503,7 +2525,7 @@ router.get(
       }
 
       const result = await pool.query(
-        `SELECT blob_key
+        `SELECT blob_key, checksum_sha256
          FROM file_versions
          WHERE file_id = $1 AND version_no = $2
          LIMIT 1`,
@@ -2517,6 +2539,8 @@ router.get(
       const diskPath = blobPathFor(result.rows[0].blob_key);
 
       await fs.access(diskPath);
+
+      await verifyBlobIntegrity(diskPath, result.rows[0].checksum_sha256);
 
       return res.download(
         diskPath,
