@@ -104,8 +104,23 @@ async function sha256(filePath) {
 
   return hash.digest("hex");
 }
-// Verify stored blob integrity before allowing a download.
+
+// Verify that a stored blob exists and its SHA-256 checksum is valid.
 async function verifyBlobIntegrity(filePath, expectedChecksum) {
+  try {
+    await fs.access(filePath);
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      console.error("Stored file blob is missing:", filePath);
+      throw fail(
+        404,
+        "File content is unavailable. Please upload the file again."
+      );
+    }
+
+    throw error;
+  }
+
   if (
     typeof expectedChecksum !== "string" ||
     !/^[a-f0-9]{64}$/i.test(expectedChecksum)
@@ -121,6 +136,7 @@ async function verifyBlobIntegrity(filePath, expectedChecksum) {
     throw fail(500, "File integrity verification failed. Download blocked.");
   }
 }
+
 
 // Reserve storage quota atomically
 async function reserveQuota(userId, bytes) {
@@ -1364,7 +1380,6 @@ router.get(
 
       const diskPath = blobPathFor(result.rows[0].blob_key);
 
-      await fs.access(diskPath);
       await verifyBlobIntegrity(
        diskPath,
        result.rows[0].checksum_sha256
@@ -2493,7 +2508,6 @@ router.get("/public/:token/download", async (req, res, next) => {
 
     const diskPath = blobPathFor(result.rows[0].blob_key);
 
-    await fs.access(diskPath);
 
     await verifyBlobIntegrity(diskPath, result.rows[0].checksum_sha256);
 
@@ -2538,7 +2552,6 @@ router.get(
 
       const diskPath = blobPathFor(result.rows[0].blob_key);
 
-      await fs.access(diskPath);
 
       await verifyBlobIntegrity(diskPath, result.rows[0].checksum_sha256);
 
