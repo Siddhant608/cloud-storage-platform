@@ -1,450 +1,379 @@
-# CloudVault – Cloud File Storage & Collaboration Platform
+# CloudVault 
+### Full-Stack Cloud Storage & File Management Platform
 
-## About the Project
+CloudVault is a full-stack cloud storage and file management platform built to provide users with a secure way to upload, organize, download, share, and manage their files.
 
-CloudVault is a cloud file storage and collaboration platform that I am developing as part of my Full-Stack Development project.
+The platform goes beyond basic file storage by implementing immutable file versioning, upload reliability mechanisms, file-integrity verification, session-based authentication, storage management, and concurrency-aware backend operations.
 
-The main idea behind this project is to allow users to upload and manage their files, organize them into folders, share files with other users, and maintain different versions of the same file.
+Built with **Node.js, Express.js, PostgreSQL, HTML, CSS, and JavaScript**, CloudVault focuses on practical backend engineering concepts and reliable file-storage workflows.
 
-One of the main features of CloudVault is its **file versioning system**. Instead of replacing an existing file whenever someone uploads an updated version, the platform stores the new version separately. This helps preserve the previous versions and makes it possible to download older versions whenever needed.
+---
 
-The backend is built using Node.js, Express, and PostgreSQL.
+##  Features
 
-1. Technologies Used
+### Authentication & Security
+- User registration and login.
+- Secure password hashing using bcrypt.
+- Session-based authentication.
+- PostgreSQL-backed session storage.
+- HTTP-only session cookies.
+- Protected file-management operations.
+- Security headers using Helmet.
+- Sensitive information redaction in HTTP logs.
 
-| Component | Technology |
+### File Management
+- Upload and download files.
+- View and manage uploaded files.
+- Organize files into folders.
+- Update file metadata.
+- Track file storage usage.
+- Manage deleted files through a trash system.
+- Restore deleted files.
+- Permanently purge files.
+
+### Immutable File Versioning
+- Every new upload creates a separate file version.
+- Previously uploaded versions are preserved.
+- Sequential version numbering.
+- Retrieve complete version history.
+- Download specific historical versions.
+- Prevent overwriting existing file-version contents.
+
+### Reliable Upload Processing
+- Idempotency-key-based upload handling.
+- Duplicate request protection.
+- Upload request tracking and leases.
+- Concurrency-aware version allocation.
+- Retry handling for conflicting operations.
+- Temporary upload processing.
+- Failure cleanup and storage consistency mechanisms.
+
+### File Integrity
+- SHA-256 checksums for file verification.
+- Integrity verification during downloads.
+- Separate storage for file contents and metadata.
+- Individual stored content associated with file versions.
+
+### File Sharing
+- Share files with other users through supported sharing functionality.
+- Create and manage public share links.
+- Access shared files through public tokens.
+- Download files through public sharing links.
+- Manage and revoke sharing access.
+
+### Activity & Storage Management
+- Activity logging for supported file operations.
+- Storage usage information.
+- User storage quota management.
+- Database-backed activity records.
+
+---
+
+## Technology Stack
+
+| Category | Technologies |
 |---|---|
 | Frontend | HTML, CSS, JavaScript |
-| Backend | Node.js, Express.js |
+| Backend | Node.js, Express.js 5 |
 | Database | PostgreSQL |
-| Authentication | Express Session, bcrypt |
+| Database Driver | node-postgres (`pg`) |
+| Authentication | express-session, bcryptjs |
+| Session Storage | connect-pg-simple |
 | File Uploads | Multer |
 | Security | Helmet |
 | Logging | Pino HTTP |
-| Testing | Node.js Test Runner |
+| File Integrity | SHA-256 |
+| File Storage | Local filesystem |
+| Development | npm, Git |
 
-2. Project Structure
+---
 
-```text
-cloud-storage-platform-starter/
-│
-├── .gitignore
-│
-└── server/
-    ├── scripts/
-    │   ├── seed_demo.js
-    │   ├── seed_fsd.sql
-    │   └── start-demo.js
-    │
-    ├── src/
-    │   ├── db/
-    │   │   └── migrations/
-    │   │       └── 001_initial_schema.sql
-    │   ├── routes/
-    │   │   ├── auth.routes.js
-    │   │   ├── files.routes.js
-    │   │   ├── folders.routes.js
-    │   │   ├── activity.routes.js
-    │   │   └── health.routes.js
-    │   ├── app.js
-    │   └── server.js
-    │
-    ├── storage/
-    │   └── blobs/
-    │
-    ├── tests/
-    ├── .env.example
-    ├── package.json
-    └── package-lock.json
+## System Architecture
+
+CloudVault uses a client-server architecture. Express serves the frontend and handles API requests, while PostgreSQL stores application metadata and the local filesystem stores file contents.
+
+```mermaid
+flowchart TD
+    A[Web Client] --> B[Express.js Application]
+
+    B --> C[Authentication]
+    B --> D[File Management]
+    B --> E[Folder Management]
+    B --> F[Sharing]
+    B --> G[Activity Tracking]
+    B --> H[Storage Management]
+
+    C --> I[(PostgreSQL)]
+    D --> I
+    E --> I
+    F --> I
+    G --> I
+    H --> I
+
+    D --> J[Upload Processing]
+    J --> K[Temporary Storage]
+    K --> L[Blob Storage]
+
+    D --> M[Download and Integrity Verification]
+    M --> L
 ```
 
-The `server` folder contains the backend code, database configuration, API routes, scripts, and tests.
+### Storage Architecture
 
-The `storage/blobs` directory is used to store the actual uploaded files separately from the database. These files are not uploaded to GitHub.
+CloudVault separates file metadata from actual file contents.
 
-3. Requirements
+- **PostgreSQL:** Stores user information, file metadata, version records, folders, sharing information, activity records, and sessions.
+- **Temporary storage:** Handles files during upload processing.
+- **Blob storage:** Stores the actual uploaded file contents.
 
-Before running the project, make sure you have installed:
+This separation helps maintain organized metadata and supports independent file-version management.
 
-- Node.js (version 24 or later recommended)
-- npm
-- PostgreSQL 18 or a compatible version
-- Git
+---
 
-You can check the installed versions using:
+## Immutable File Versioning
 
-```powershell
-node --version
-npm --version
-psql --version
-git --version
-```
+A core design principle of CloudVault is its append-only file versioning approach.
 
-4. Download the Project
+When a user uploads a file again, the platform creates a new version instead of replacing the contents of an existing version.
 
-Clone the repository:
+For example:
 
-```powershell
-git clone https://github.com/Siddhant608/cloud-storage-platform.git
-```
+| Upload | Version | Behaviour |
+|---|---|---|
+| First upload | v1 | Original content stored |
+| Second upload | v2 | New version created |
+| Third upload | v3 | Previous versions preserved |
+| Fourth upload | v4 | Complete history maintained |
 
-Go inside the project folder:
+Users can view the version history and download a particular version when needed.
 
-```powershell
-cd cloud-storage-platform
-```
+This approach helps prevent accidental loss of historical file contents.
 
-Then move into the backend folder:
+---
 
-```powershell
-cd server
-```
+## Reliability & Concurrency
 
-Install the required packages:
+CloudVault includes backend mechanisms designed to make file operations more reliable.
 
-```powershell
-npm install
-```
+**Idempotent uploads**
+- Upload requests use idempotency keys.
+- Duplicate requests can be identified.
+- Retries are handled without unnecessarily creating duplicate uploads.
 
-5. Environment Setup
+**Concurrency handling**
+- Version allocation accounts for overlapping upload operations.
+- Database constraints and retry mechanisms help protect version consistency.
+- Upload request leases support reliable operation tracking.
 
-The project uses a `.env` file to store the database connection details and other configuration.
+**Storage consistency**
+- Temporary upload processing.
+- Storage quota checks.
+- Blob creation and metadata recording.
+- Upload-operation state management.
+- Failure handling and cleanup.
+- Durable purge-job support.
 
-First, create the file using the example:
+---
 
-```powershell
-Copy-Item .env.example .env
-```
+## Database & Migrations
 
-Open it:
+PostgreSQL is the primary relational database.
 
-```powershell
-notepad .env
-```
+The database supports:
+- User accounts and authentication.
+- File metadata and version history.
+- Folder organization.
+- Sharing and public share links.
+- Activity records.
+- User sessions.
+- Upload request tracking.
+- Storage management and quota information.
 
-Add your local PostgreSQL credentials:
+Database migrations are maintained in `server/src/db/migrations/`:
 
-```env
-PORT=3000
-NODE_ENV=development
-DATABASE_URL=postgresql://postgres:YOUR_POSTGRES_PASSWORD@localhost:5432/cloud_storage_db
-```
+| Migration | Purpose |
+|---|---|
+| `001_initial_schema.sql` | Initial database schema |
+| `002_upload_request_leases.sql` | Upload request lease support |
+| `003_durable_purge_jobs.sql` | Durable purge-job support |
+| `004_unique_active_file_names.sql` | Uniqueness for active file names |
+| `005_add_purged_at.sql` | Purge timestamp tracking |
 
-Replace `YOUR_POSTGRES_PASSWORD` with your own PostgreSQL password.
+Apply the migrations in numerical order when setting up a new database.
 
-A few things to remember:
+---
 
-- Do not upload your `.env` file to GitHub.
-- Do not share your database password.
-- Every team member should configure their own `.env` file.
-- The `.env.example` file can be shared because it contains placeholder values.
+## API Overview
 
-6. Database Setup
+The backend exposes REST API modules for the platform's main operations.
 
-CloudVault uses PostgreSQL to store user information, file details, folder information, permissions, version history, and activity records.
+| API Base Path | Functionality |
+|---|---|
+| `/api/health` | Application and database health |
+| `/api/auth` | Registration, login, logout and user sessions |
+| `/api/files` | Uploads, downloads, file listing and version history |
+| `/api/files` | Sharing, public links, trash, restore and deletion |
+| `/api/folders` | Folder creation, listing, updating and deletion |
+| `/api/activity` | Activity records |
+| `/api/storage` | Storage usage information |
 
-For the demonstration setup, create a separate database named `cloud_storage_demo_db`.
+Authentication is required for protected file and folder operations. Public share-link access is supported separately.
 
-Run this command:
-
-```powershell
-psql -U postgres -h localhost -p 5432 -d postgres -c "CREATE DATABASE cloud_storage_demo_db;"
-```
-
-If the database already exists, there is no need to create it again.
-
-Now initialize the database tables using the migration file:
-
-```powershell
-psql -U postgres -h localhost -p 5432 -d cloud_storage_demo_db -f .\src\db\migrations\001_initial_schema.sql
-```
-
-The migration creates the following tables:
-
-1. Users
-2. Folders
-3. Files
-4. File Versions
-5. Folder Members
-6. File Shares
-7. Share Links
-8. Storage Usage
-9. Upload Requests
-10. Activity Logs
-
-It also creates indexes and database triggers to protect file-version and activity history from being modified or deleted.
-
-**Note:** The demo setup uses `cloud_storage_demo_db` separately. The original `cloud_storage_db` is kept untouched.
-
-]7. Adding Demo Data
-
-To make testing and demonstration easier, I have added a demo data seeder.
-
-Run it from the `server` directory:
-
-```powershell
-node .\scripts\seed_demo.js
-```
-
-It automatically creates sample users, folders, files, file versions, sharing records, and activity logs.
-
-The current demo database contains:
-
-| Data | Number of Records |
-|---|---:|
-| Users | 100 |
-| Folders | 250 |
-| Files | 350 |
-| File Versions | 1,050 |
-| Folder Memberships | 300 |
-| File Shares | 300 |
-| Share Links | 120 |
-| Upload Requests | 1,200 |
-| Activity Logs | 1,500 |
-| **Total** | **5,270** |
-
-The seeder also generates actual file contents in the local blob storage so that file downloads can be tested.
-
-It has a safety check to prevent accidentally seeding a database that already contains data.
-
-8. Running the Backend
-
-For the demo setup, use:
-
-```powershell
-node .\scripts\start-demo.js
-```
-
-This script automatically connects the backend to `cloud_storage_demo_db`.
-
-Alternatively, for normal development, you can use:
-
-```powershell
-npm run dev
-```
-
-The normal development command uses the database specified in your `.env` file, so make sure it points to the correct database first.
-
-Once the server starts, the backend will be available at:
+Local development API address:
 
 ```text
 http://localhost:3000
 ```
 
-To check whether the backend and database are working, open:
+---
+
+## Project Structure
 
 ```text
-http://localhost:3000/api/health
+cloud-storage-platform-starter/
+│
+├── client/
+│   ├── index.html
+│   ├── share.html
+│   ├── css/
+│   │   ├── styles.css
+│   │   └── share.css
+│   └── js/
+│       ├── app.js
+│       └── share.js
+│
+├── server/
+│   ├── src/
+│   │   ├── config/
+│   │   ├── db/
+│   │   │   └── migrations/
+│   │   ├── middleware/
+│   │   ├── routes/
+│   │   │   ├── health.routes.js
+│   │   │   ├── auth.routes.js
+│   │   │   ├── files.routes.js
+│   │   │   ├── folders.routes.js
+│   │   │   ├── activity.routes.js
+│   │   │   └── storage.routes.js
+│   │   ├── app.js
+│   │   └── server.js
+│   │
+│   ├── scripts/
+│   ├── storage/
+│   │   ├── tmp/
+│   │   └── blobs/
+│   │
+│   └── package.json
+│
+├── .gitignore
+└── README.md
 ```
-
-A successful response means the server is running and the database connection is working.
-
-9. Demo Account
-
-For testing the application, use the following demo account:
-
-| Field | Details |
-|---|---|
-| Email | `demo.owner@cloudvault.demo` |
-| Password | `CloudVaultDemo!2026` |
-
-These credentials are only meant for local testing and demonstration.
-
-The project uses session-based authentication, so the session cookie needs to be maintained when accessing protected APIs.
-
-10. Available API Endpoints
-
-All APIs use the following base URL:
-
-```text
-http://localhost:3000/api
-```
-
-### Health Check
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| GET | `/health` | Check server and database status |
-
-### Authentication
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| POST | `/auth/register` | Register a new user |
-| POST | `/auth/login` | Log in |
-| GET | `/auth/me` | Get current user details |
-| POST | `/auth/logout` | Log out |
-
-### File Management
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| POST | `/files` | Upload a file |
-| GET | `/files` | Get accessible files |
-| PATCH | `/files/:id` | Update file details |
-| DELETE | `/files/:id` | Delete a file |
-| GET | `/files/:id/versions` | View version history |
-| POST | `/files/:id/versions` | Upload a new version |
-| GET | `/files/:id/versions/:versionNo/download` | Download a particular version |
-
-File uploads use multipart form data with the field name `file`.
-
-### File Sharing
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| GET | `/files/:id/shares` | View file shares |
-| POST | `/files/:id/shares` | Share a file with another user |
-| DELETE | `/files/:id/shares/:shareId` | Revoke file access |
-
-### Public Share Links
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| POST | `/files/:id/share-links` | Create a share link |
-| GET | `/files/:id/share-links` | View share links |
-| DELETE | `/files/:id/share-links/:linkId` | Revoke a share link |
-| GET | `/files/public/:token` | Access a shared file |
-| GET | `/files/public/:token/download` | Download a shared file |
-| GET | `/files/public/:token/versions/:versionNo/download` | Download an older version |
-| POST | `/files/public/:token/versions` | Upload a version using an editor-enabled share link |
-
-### Folder Management
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| POST | `/folders` | Create a folder |
-| GET | `/folders` | View folders |
-| PATCH | `/folders/:id` | Update a folder |
-| DELETE | `/folders/:id` | Delete a folder |
-
-### Activity
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| GET | `/activity` | View activity history |
-
-Most of these endpoints require the user to be logged in. Public share-link endpoints are available without normal user authentication, subject to the permissions of the link.
-
-11. File Versioning and Upload Handling
-
-File versioning is one of the main parts of this project.
-
-When a user uploads an updated file, CloudVault does not overwrite the previous file. Instead, it creates a new version and keeps the older version available.
-
-Some of the things implemented in this part are:
-
-- Separate storage for each file version.
-- Unique version numbers for each file.
-- SHA-256 checksums for file integrity.
-- Idempotency keys to avoid duplicate uploads.
-- Database transactions for safer uploads.
-- Protection against duplicate or missing version numbers during concurrent uploads.
-
-For upload requests, an `Idempotency-Key` header is used.
-
-Example:
-
-```text
-Idempotency-Key: unique-upload-request-001
-```
-
-If the same completed request is repeated with the same key, it should not create another version.
-
-12. Running Automated Tests
-
-I have also added an automated test to check the upload and versioning functionality.
-
-It checks:
-
-- User authentication.
-- File uploads.
-- Duplicate upload prevention.
-- Multiple uploads happening at the same time.
-- Correct version numbering.
-- File downloads.
-- Downloaded file contents and checksums.
-
-Before running the tests, set the demo login credentials in PowerShell:
-
-```powershell
-$env:CLOUDVAULT_TEST_EMAIL = "demo.owner@cloudvault.demo"
-$env:CLOUDVAULT_TEST_PASSWORD = "CloudVaultDemo!2026"
-```
-
-Make sure the demo database is seeded and the backend is running.
-
-Now run:
-
-```powershell
-npm test
-```
-
-The test includes 20 simultaneous uploads and checks that all versions are stored correctly without duplicate or missing version numbers.
-
-13. Common Issues
-
-### PostgreSQL is not connecting
-
-Check whether PostgreSQL is running:
-
-```powershell
-Get-Service *postgres*
-```
-
-Also check the database connection and credentials in `.env`.
-
-### Port 3000 is already in use
-
-Check which process is using the port:
-
-```powershell
-netstat -ano | findstr :3000
-```
-
-### Environment file is missing
-
-Make sure you have created `server/.env` from `.env.example`.
-
-### Demo data is not available
-
-Run the initial migration first and then execute:
-
-```powershell
-node .\scripts\seed_demo.js
-```
-
-### Automated tests are failing at login
-
-Make sure the test credentials are set in the same PowerShell window where you run `npm test`.
-
-14. Working on the Project Together
-
-This project is being developed by two team members. To make sure both of us can work on the same codebase, we are using GitHub for version control.
-
-For setting up the project on the other team member's system:
-
-1. Clone the GitHub repository.
-2. Install Node.js and PostgreSQL.
-3. Open the `server` directory.
-4. Run `npm install`.
-5. Create a local `.env` file using `.env.example`.
-6. Create the `cloud_storage_demo_db` database.
-7. Run the initial database migration.
-8. Run the demo seeder.
-9. Start the backend using `node scripts/start-demo.js`.
-10. Check the health endpoint and test the demo login.
-
-Both members should use their own local database credentials. We can share code updates through GitHub using commits and pushes.
-
-The `.env` file, database passwords, and locally stored file blobs should not be uploaded to the repository.
-
-15. GitHub Repository
-
-The source code is available here:
-
-[CloudVault – GitHub Repository](https://github.com/Siddhant608/cloud-storage-platform)
 
 ---
 
-*CloudVault – Secure Storage. Immutable Versions. Collaborative Access.*
+##  Getting Started
+
+### Prerequisites
+
+- Node.js
+- npm
+- PostgreSQL
+- Git
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/Siddhant608/cloud-storage-platform.git
+cd cloud-storage-platform
+```
+
+### 2. Install backend dependencies
+
+```bash
+cd server
+npm install
+```
+
+### 3. Create the PostgreSQL database
+
+```sql
+CREATE DATABASE cloud_storage_db;
+```
+
+### 4. Configure environment variables
+
+Create a `.env` file inside the `server` directory.
+
+Use the project's `.env.example` as a reference and configure the required database connection, session secret, and application settings.
+
+Do not commit credentials or secrets to GitHub.
+
+### 5. Apply database migrations
+
+Apply the SQL migration files inside:
+
+```text
+server/src/db/migrations/
+```
+
+Run them in numerical order, from `001_initial_schema.sql` through `005_add_purged_at.sql`.
+
+### 6. Start the development server
+
+```bash
+npm run dev
+```
+
+The backend runs using Node.js watch mode.
+
+The application serves the frontend through the Express server.
+
+### 7. Run tests
+
+```bash
+npm test
+```
+
+---
+
+## Testing
+
+The application has undergone functional and concurrent API testing. The local backend successfully completed a mixed API test involving 500 requests with zero reported HTTP failures.
+
+---
+
+## Future Improvements
+
+- Integration with cloud object storage.
+- More advanced sharing permissions.
+- Improved search and filtering.
+- File preview and thumbnail generation.
+- Expanded automated testing.
+- Production deployment and scalability improvements.
+- Enhanced monitoring and observability.
+
+---
+
+## Key Engineering Concepts
+
+CloudVault brings together several practical software engineering concepts:
+
+- Full-stack application development.
+- REST API design.
+- Relational database management.
+- Secure authentication and session management.
+- File storage architecture.
+- Immutable data versioning.
+- Idempotent request processing.
+- Concurrency control.
+- File-integrity verification.
+- Database migrations and constraints.
+- Error handling and storage consistency.
+
+---
+
+## Project Status
+
+CloudVault is an actively developed cloud-storage and file-management platform. Its implemented functionality covers authentication, file operations, immutable versioning, sharing, folder management, trash and recovery, storage tracking, and upload reliability.
+
+Further development is focused on scalability, security, and production readiness.
