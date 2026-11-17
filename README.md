@@ -94,27 +94,27 @@ CloudVault uses a client-server architecture. Express serves the frontend and ha
 
 ```mermaid
 flowchart TD
-    A[Web Client] --> B[Express.js Application]
+    A["Web Client"] --> B["Express.js Application"]
 
-    B --> C[Authentication]
-    B --> D[File Management]
-    B --> E[Folder Management]
-    B --> F[Sharing]
-    B --> G[Activity Tracking]
-    B --> H[Storage Management]
+    B --> C["Authentication"]
+    B --> D["File Management"]
+    B --> E["Folder Management"]
+    B --> F["Sharing"]
+    B --> G["Activity Tracking"]
+    B --> H["Storage Management"]
 
-    C --> I[(PostgreSQL)]
+    C --> I[("PostgreSQL")]
     D --> I
     E --> I
     F --> I
     G --> I
     H --> I
 
-    D --> J[Upload Processing]
-    J --> K[Temporary Storage]
-    K --> L[Blob Storage]
+    D --> J["Upload Processing"]
+    J --> K["Temporary Storage"]
+    K --> L["Blob Storage"]
 
-    D --> M[Download and Integrity Verification]
+    D --> M["Download and Integrity Verification"]
     M --> L
 ```
 
